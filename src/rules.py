@@ -1,0 +1,565 @@
+"""Precondition rules knowledge base for Multi-Vendor Network CVE Audit Engine.
+
+Defines necessary conditions (affected OS version ranges) and
+sufficient conditions (active feature preconditions) for high-impact CVEs.
+"""
+
+from dataclasses import dataclass, field
+from typing import Any, Callable, Dict, List
+
+from src.config import (
+    OS_CISCO_ASA,
+    OS_CISCO_IOS_CLASSIC,
+    OS_CISCO_IOS_XE,
+    OS_FORTINET_FORTIOS,
+    OS_PALOALTO_PANOS,
+    VENDOR_CISCO,
+    VENDOR_FORTINET,
+    VENDOR_PALOALTO,
+)
+from src.version_utils import compare_versions, is_version_in_range
+
+
+@dataclass
+class PreconditionRule:
+    """Represents a vulnerability correlation rule."""
+
+    cve_id: str
+    title: str
+    vendor: str
+    os_family: str
+    cvss_base: float
+    in_kev: bool
+    affected_version_description: str
+    description: str
+    precondition_description: str
+    mitigation_cmd: str
+    version_checker: Callable[[str], bool]
+    precondition_checker: Callable[[Dict[str, Any]], bool]
+    references: List[str] = field(default_factory=list)
+
+    def is_version_affected(self, version: str) -> bool:
+        """Evaluate if version meets the necessary condition."""
+        if not version:
+            return False
+        try:
+            return self.version_checker(version)
+        except Exception:
+            return False
+
+    def is_precondition_met(self, features: Dict[str, Any]) -> bool:
+        """Evaluate if device configuration meets the sufficient condition."""
+        if not features:
+            return False
+        try:
+            return self.precondition_checker(features)
+        except Exception:
+            return False
+
+
+# ==============================================================================
+# 1. CISCO ASA RULES
+# ==============================================================================
+
+def _check_asa_cve_2020_3452_ver(v: str) -> bool:
+    """CVE-2020-3452 affects ASA < 9.14.1(10)."""
+    return is_version_in_range(v, min_ver="9.0", max_ver="9.14.1(10)", include_min=True, include_max=False)
+
+
+def _check_asa_cve_2020_3187_ver(v: str) -> bool:
+    """CVE-2020-3187 affects ASA < 9.14.1(15)."""
+    return is_version_in_range(v, min_ver="9.0", max_ver="9.14.1(15)", include_min=True, include_max=False)
+
+
+def _check_asa_cve_2018_0101_ver(v: str) -> bool:
+    """CVE-2018-0101 affects ASA 9.0 to 9.8.2."""
+    return is_version_in_range(v, min_ver="9.0", max_ver="9.8.2", include_min=True, include_max=False)
+
+
+def _check_asa_cve_2020_3580_ver(v: str) -> bool:
+    """CVE-2020-3580 affects ASA < 9.16.2."""
+    return is_version_in_range(v, min_ver="9.0", max_ver="9.16.2", include_min=True, include_max=False)
+
+
+def _check_asa_cve_2023_20269_ver(v: str) -> bool:
+    """CVE-2023-20269 affects ASA < 9.18.4, 9.19 < 9.19.1(28), 9.20 < 9.20.2(2)."""
+    if compare_versions(v, "9.18.0") < 0:
+        return True
+    if compare_versions(v, "9.18.0") >= 0 and compare_versions(v, "9.18.4") < 0:
+        return True
+    if compare_versions(v, "9.19.0") >= 0 and compare_versions(v, "9.19.1(28)") < 0:
+        return True
+    if compare_versions(v, "9.20.0") >= 0 and compare_versions(v, "9.20.2(2)") < 0:
+        return True
+    return False
+
+
+def _check_asa_cve_2024_20353_ver(v: str) -> bool:
+    """CVE-2024-20353 (Line Dancer) affects 9.16 < 9.16.4(57), 9.18 < 9.18.4(22), 9.20 <= 9.20(3)."""
+    if compare_versions(v, "9.16.0") < 0:
+        return True
+    if compare_versions(v, "9.16.0") >= 0 and compare_versions(v, "9.16.4(57)") < 0:
+        return True
+    if compare_versions(v, "9.18.0") >= 0 and compare_versions(v, "9.18.4(22)") < 0:
+        return True
+    # In 9.20 train, 9.20(3) base and below are affected; fixed in 9.20.3(2) and 9.20.4
+    if compare_versions(v, "9.20.0") >= 0 and compare_versions(v, "9.20(3)2") < 0:
+        return True
+    return False
+
+
+def _check_asa_cve_2024_20358_ver(v: str) -> bool:
+    """CVE-2024-20358 (Line Runner) affects ASA 9.12 to 9.20.2."""
+    return is_version_in_range(v, min_ver="9.12.0", max_ver="9.20.2", include_min=True, include_max=True)
+
+
+def _check_asa_cve_2016_6366_ver(v: str) -> bool:
+    """CVE-2016-6366 (EXTRABACON) affects ASA < 9.6.2."""
+    return is_version_in_range(v, min_ver="7.0", max_ver="9.6.2", include_min=True, include_max=False)
+
+
+def _check_asa_cve_2022_20623_ver(v: str) -> bool:
+    """CVE-2022-20623 affects ASA 9.7 to 9.16.2."""
+    return is_version_in_range(v, min_ver="9.7.0", max_ver="9.16.2", include_min=True, include_max=False)
+
+
+def _check_asa_cve_2021_1445_ver(v: str) -> bool:
+    """CVE-2021-1445 affects ASA < 9.14.2(4)."""
+    return is_version_in_range(v, min_ver="9.0", max_ver="9.14.2(4)", include_min=True, include_max=False)
+
+
+# ==============================================================================
+# 2. CISCO IOS XE RULES
+# ==============================================================================
+
+def _check_ios_xe_cve_2023_20198_ver(v: str) -> bool:
+    """CVE-2023-20198 affects IOS XE 16.1.1 through 17.12.1."""
+    return is_version_in_range(v, min_ver="16.1.1", max_ver="17.12.2", include_min=True, include_max=False)
+
+
+def _check_ios_xe_cve_2023_20273_ver(v: str) -> bool:
+    """CVE-2023-20273 affects IOS XE 16.1.1 through 17.12.1."""
+    return is_version_in_range(v, min_ver="16.1.1", max_ver="17.12.2", include_min=True, include_max=False)
+
+
+def _check_ios_cve_2017_6742_ver(v: str) -> bool:
+    """CVE-2017-6742 (SNMP) affects IOS/IOS XE 15.0 through 16.6.1."""
+    return is_version_in_range(v, min_ver="15.0.0", max_ver="16.6.2", include_min=True, include_max=False)
+
+
+def _check_ios_cve_2018_0171_ver(v: str) -> bool:
+    """CVE-2018-0171 (Smart Install) affects IOS/IOS XE 12.2 through 16.6.1."""
+    return is_version_in_range(v, min_ver="12.2.0", max_ver="16.6.2", include_min=True, include_max=False)
+
+
+# ==============================================================================
+# 3. FORTINET FORTIOS RULES
+# ==============================================================================
+
+def _check_forti_cve_2024_21762_ver(v: str) -> bool:
+    """CVE-2024-21762 affects FortiOS 7.4.0-7.4.2, 7.2.0-7.2.6, 7.0.0-7.0.13, 6.4.0-6.4.14."""
+    if is_version_in_range(v, "7.4.0", "7.4.2", True, True):
+        return True
+    if is_version_in_range(v, "7.2.0", "7.2.6", True, True):
+        return True
+    if is_version_in_range(v, "7.0.0", "7.0.13", True, True):
+        return True
+    if is_version_in_range(v, "6.4.0", "6.4.14", True, True):
+        return True
+    return False
+
+
+def _check_forti_cve_2023_27997_ver(v: str) -> bool:
+    """CVE-2023-27997 (XORtigate) affects FortiOS 7.2.0-7.2.4, 7.0.0-7.0.11, 6.4.0-6.4.12."""
+    if is_version_in_range(v, "7.2.0", "7.2.4", True, True):
+        return True
+    if is_version_in_range(v, "7.0.0", "7.0.11", True, True):
+        return True
+    if is_version_in_range(v, "6.4.0", "6.4.12", True, True):
+        return True
+    return False
+
+
+def _check_forti_cve_2022_42475_ver(v: str) -> bool:
+    """CVE-2022-42475 affects FortiOS 7.2.0-7.2.2, 7.0.0-7.0.8, 6.4.0-6.4.10."""
+    if is_version_in_range(v, "7.2.0", "7.2.2", True, True):
+        return True
+    if is_version_in_range(v, "7.0.0", "7.0.8", True, True):
+        return True
+    if is_version_in_range(v, "6.4.0", "6.4.10", True, True):
+        return True
+    return False
+
+
+def _check_forti_cve_2022_40684_ver(v: str) -> bool:
+    """CVE-2022-40684 affects FortiOS 7.2.0-7.2.1, 7.0.0-7.0.6."""
+    if is_version_in_range(v, "7.2.0", "7.2.1", True, True):
+        return True
+    if is_version_in_range(v, "7.0.0", "7.0.6", True, True):
+        return True
+    return False
+
+
+# ==============================================================================
+# 4. PALO ALTO PAN-OS RULES
+# ==============================================================================
+
+def _check_pan_cve_2024_3400_ver(v: str) -> bool:
+    """CVE-2024-3400 affects PAN-OS 10.2 < 10.2.9, 11.0 < 11.0.4, 11.1 < 11.1.3."""
+    if is_version_in_range(v, "10.2.0", "10.2.9", True, False):
+        return True
+    if is_version_in_range(v, "11.0.0", "11.0.4", True, False):
+        return True
+    if is_version_in_range(v, "11.1.0", "11.1.3", True, False):
+        return True
+    return False
+
+
+def _check_pan_cve_2022_0028_ver(v: str) -> bool:
+    """CVE-2022-0028 affects PAN-OS 10.1 < 10.1.6-h6, 10.2 < 10.2.2-h2."""
+    if is_version_in_range(v, "10.1.0", "10.1.6-h6", True, False):
+        return True
+    if is_version_in_range(v, "10.2.0", "10.2.2-h2", True, False):
+        return True
+    return False
+
+
+def _check_pan_cve_2020_2021_ver(v: str) -> bool:
+    """CVE-2020-2021 affects PAN-OS 8.1 <= 8.1.14, 9.0 <= 9.0.8, 9.1 <= 9.1.2."""
+    if is_version_in_range(v, "8.1.0", "8.1.14", True, True):
+        return True
+    if is_version_in_range(v, "9.0.0", "9.0.8", True, True):
+        return True
+    if is_version_in_range(v, "9.1.0", "9.1.2", True, True):
+        return True
+    return False
+
+
+# ==============================================================================
+# PRECONDITION RULES LIST (21 Total)
+# ==============================================================================
+
+PRECONDITION_RULES: List[PreconditionRule] = [
+    # ------------------- Cisco ASA -------------------
+    PreconditionRule(
+        cve_id="CVE-2020-3452",
+        title="Cisco ASA/FTD Web Services Read-Only Path Traversal",
+        vendor=VENDOR_CISCO,
+        os_family=OS_CISCO_ASA,
+        cvss_base=7.5,
+        in_kev=True,
+        affected_version_description="ASA < 9.14.1(10)",
+        description="Allows unauthenticated remote attackers to read arbitrary files within the web services root via directory traversal in HTTP GET requests.",
+        precondition_description="HTTP Server or WebVPN enabled (http server enable / webvpn)",
+        mitigation_cmd="no http server enable  # or remove public interface access: no http <ip> <mask> outside",
+        version_checker=_check_asa_cve_2020_3452_ver,
+        precondition_checker=lambda f: bool(f.get("http_server") or f.get("webvpn")),
+        references=["https://nvd.nist.gov/vuln/detail/CVE-2020-3452"],
+    ),
+    PreconditionRule(
+        cve_id="CVE-2020-3187",
+        title="Cisco ASA/FTD Web Services Path Traversal & Arbitrary File Deletion",
+        vendor=VENDOR_CISCO,
+        os_family=OS_CISCO_ASA,
+        cvss_base=9.1,
+        in_kev=True,
+        affected_version_description="ASA < 9.14.1(15)",
+        description="Allows unauthenticated remote attackers to conduct directory traversal and delete sensitive files on the filesystem, causing system corruption and DoS.",
+        precondition_description="HTTP Server or WebVPN enabled (http server enable / webvpn)",
+        mitigation_cmd="no http server enable  # upgrade to ASA 9.14.1(15)+",
+        version_checker=_check_asa_cve_2020_3187_ver,
+        precondition_checker=lambda f: bool(f.get("http_server") or f.get("webvpn")),
+        references=["https://nvd.nist.gov/vuln/detail/CVE-2020-3187"],
+    ),
+    PreconditionRule(
+        cve_id="CVE-2018-0101",
+        title="Cisco ASA SSL VPN XML Parser Remote Code Execution & DoS",
+        vendor=VENDOR_CISCO,
+        os_family=OS_CISCO_ASA,
+        cvss_base=9.8,
+        in_kev=True,
+        affected_version_description="ASA 9.0 to 9.8.2",
+        description="Vulnerability in Secure Sockets Layer (SSL) VPN functionality allows unauthenticated remote attackers to execute arbitrary code or reload the affected system.",
+        precondition_description="WebVPN / SSL VPN enabled on any interface",
+        mitigation_cmd="webvpn -> no enable <interface>  # or upgrade to 9.8.2+",
+        version_checker=_check_asa_cve_2018_0101_ver,
+        precondition_checker=lambda f: bool(f.get("webvpn") or f.get("ssl_vpn")),
+        references=["https://nvd.nist.gov/vuln/detail/CVE-2018-0101"],
+    ),
+    PreconditionRule(
+        cve_id="CVE-2020-3580",
+        title="Cisco ASA/FTD Web Services Multiple Cross-Site Scripting",
+        vendor=VENDOR_CISCO,
+        os_family=OS_CISCO_ASA,
+        cvss_base=6.1,
+        in_kev=True,
+        affected_version_description="ASA < 9.16.2",
+        description="Cross-site scripting (XSS) in web services interface allows an unauthenticated remote attacker to execute arbitrary script code in the context of user's session.",
+        precondition_description="HTTP Server or WebVPN enabled",
+        mitigation_cmd="no http server enable  # or restrict HTTP access to trusted management IP",
+        version_checker=_check_asa_cve_2020_3580_ver,
+        precondition_checker=lambda f: bool(f.get("http_server") or f.get("webvpn")),
+        references=["https://nvd.nist.gov/vuln/detail/CVE-2020-3580"],
+    ),
+    PreconditionRule(
+        cve_id="CVE-2023-20269",
+        title="Cisco ASA/FTD Remote Access VPN Unauthorized Access & Brute-Force",
+        vendor=VENDOR_CISCO,
+        os_family=OS_CISCO_ASA,
+        cvss_base=9.1,
+        in_kev=True,
+        affected_version_description="ASA < 9.18.4, 9.19 < 9.19.1(28), 9.20 < 9.20.2(2)",
+        description="Vulnerability in remote access VPN feature allows unauthenticated attackers to conduct brute-force attacks and identify valid credentials (Akira Ransomware).",
+        precondition_description="WebVPN or SSL-VPN enabled",
+        mitigation_cmd="group-policy DfltGrpPolicy attributes -> vpn-simultaneous-logins 0  # configure DAP or MFA",
+        version_checker=_check_asa_cve_2023_20269_ver,
+        precondition_checker=lambda f: bool(f.get("webvpn") or f.get("ssl_vpn")),
+        references=["https://nvd.nist.gov/vuln/detail/CVE-2023-20269"],
+    ),
+    PreconditionRule(
+        cve_id="CVE-2024-20353",
+        title="Cisco ASA/FTD Web Server Denial of Service (ArcaneDoor / Line Dancer)",
+        vendor=VENDOR_CISCO,
+        os_family=OS_CISCO_ASA,
+        cvss_base=8.6,
+        in_kev=True,
+        affected_version_description="ASA 9.16 < 9.16.4(57), 9.18 < 9.18.4(22), 9.20 <= 9.20(3)",
+        description="Management and VPN web server vulnerability allowing unauthenticated remote attackers to trigger unexpected device reload and persistent DoS.",
+        precondition_description="HTTP Server or WebVPN enabled (http server enable / webvpn)",
+        mitigation_cmd="no http 0.0.0.0 0.0.0.0 outside  # remove HTTP listening on external untrusted interfaces",
+        version_checker=_check_asa_cve_2024_20353_ver,
+        precondition_checker=lambda f: bool(f.get("http_server") or f.get("webvpn")),
+        references=["https://nvd.nist.gov/vuln/detail/CVE-2024-20353"],
+    ),
+    PreconditionRule(
+        cve_id="CVE-2024-20358",
+        title="Cisco ASA/FTD Command Injection & ROMMON Implant (ArcaneDoor / Line Runner)",
+        vendor=VENDOR_CISCO,
+        os_family=OS_CISCO_ASA,
+        cvss_base=6.0,
+        in_kev=True,
+        affected_version_description="ASA 9.12 to 9.20.2",
+        description="Vulnerability in restore functionality allows authenticated local attacker to execute arbitrary OS commands with root privileges and implant persistent ROMMON code.",
+        precondition_description="AAA authentication enabled / administrative CLI access",
+        mitigation_cmd="verify /md5 disk0:<image>  # verify integrity of boot firmware and upgrade ASA software",
+        version_checker=_check_asa_cve_2024_20358_ver,
+        precondition_checker=lambda f: bool(f.get("aaa")),
+        references=["https://nvd.nist.gov/vuln/detail/CVE-2024-20358"],
+    ),
+    PreconditionRule(
+        cve_id="CVE-2016-6366",
+        title="Cisco ASA SNMP Buffer Overflow Vulnerability (EXTRABACON)",
+        vendor=VENDOR_CISCO,
+        os_family=OS_CISCO_ASA,
+        cvss_base=8.8,
+        in_kev=True,
+        affected_version_description="ASA < 9.6.2",
+        description="SNMP subsystem buffer overflow allows unauthenticated remote attacker to reload device or execute arbitrary shellcode (Shadow Brokers release).",
+        precondition_description="SNMP Server configured (snmp-server community/host)",
+        mitigation_cmd="no snmp-server  # or restrict SNMP access to secure internal management network",
+        version_checker=_check_asa_cve_2016_6366_ver,
+        precondition_checker=lambda f: bool(f.get("snmp_server")),
+        references=["https://nvd.nist.gov/vuln/detail/CVE-2016-6366"],
+    ),
+    PreconditionRule(
+        cve_id="CVE-2022-20623",
+        title="Cisco ASA/FTD AnyConnect SSL VPN Denial of Service",
+        vendor=VENDOR_CISCO,
+        os_family=OS_CISCO_ASA,
+        cvss_base=7.5,
+        in_kev=True,
+        affected_version_description="ASA 9.7 to 9.16.2",
+        description="Flaw in AnyConnect SSL VPN packet processing causes memory exhaustion and crash upon processing malformed SSL VPN traffic.",
+        precondition_description="WebVPN or SSL-VPN enabled",
+        mitigation_cmd="webvpn -> no enable <interface>  # upgrade to ASA 9.16.2+",
+        version_checker=_check_asa_cve_2022_20623_ver,
+        precondition_checker=lambda f: bool(f.get("webvpn") or f.get("ssl_vpn")),
+        references=["https://nvd.nist.gov/vuln/detail/CVE-2022-20623"],
+    ),
+    PreconditionRule(
+        cve_id="CVE-2021-1445",
+        title="Cisco ASA/FTD CLI Parser Command Injection",
+        vendor=VENDOR_CISCO,
+        os_family=OS_CISCO_ASA,
+        cvss_base=6.7,
+        in_kev=True,
+        affected_version_description="ASA < 9.14.2(4)",
+        description="Vulnerability in CLI parser allows authenticated administrator to inject arbitrary commands to execute as root on the Linux underlying kernel.",
+        precondition_description="AAA authentication active / administrative access",
+        mitigation_cmd="Upgrade ASA to 9.14.2(4)+ and restrict privilege level 15 admin accounts",
+        version_checker=_check_asa_cve_2021_1445_ver,
+        precondition_checker=lambda f: bool(f.get("aaa")),
+        references=["https://nvd.nist.gov/vuln/detail/CVE-2021-1445"],
+    ),
+
+    # ------------------- Cisco IOS XE -------------------
+    PreconditionRule(
+        cve_id="CVE-2023-20198",
+        title="Cisco IOS XE Web UI Privilege Escalation",
+        vendor=VENDOR_CISCO,
+        os_family=OS_CISCO_IOS_XE,
+        cvss_base=10.0,
+        in_kev=True,
+        affected_version_description="IOS XE 16.1.1 through 17.12.1",
+        description="Allows unauthenticated remote attackers to create a local administrative user account with privilege level 15 via exposed Web UI interface.",
+        precondition_description="HTTP or HTTPS server enabled (ip http server / ip http secure-server)",
+        mitigation_cmd="no ip http server ; no ip http secure-server",
+        version_checker=_check_ios_xe_cve_2023_20198_ver,
+        precondition_checker=lambda f: bool(f.get("http_server")),
+        references=["https://nvd.nist.gov/vuln/detail/CVE-2023-20198"],
+    ),
+    PreconditionRule(
+        cve_id="CVE-2023-20273",
+        title="Cisco IOS XE Web UI Command Injection",
+        vendor=VENDOR_CISCO,
+        os_family=OS_CISCO_IOS_XE,
+        cvss_base=7.2,
+        in_kev=True,
+        affected_version_description="IOS XE 16.1.1 through 17.12.1",
+        description="Allows authenticated attackers with privilege level 15 (obtained via CVE-2023-20198) to execute arbitrary commands with root privileges.",
+        precondition_description="HTTP or HTTPS server enabled (ip http server / ip http secure-server)",
+        mitigation_cmd="no ip http server ; no ip http secure-server",
+        version_checker=_check_ios_xe_cve_2023_20273_ver,
+        precondition_checker=lambda f: bool(f.get("http_server")),
+        references=["https://nvd.nist.gov/vuln/detail/CVE-2023-20273"],
+    ),
+    PreconditionRule(
+        cve_id="CVE-2017-6742",
+        title="Cisco IOS / IOS XE SNMP Subsystem Remote Code Execution (Jaguar Tooth)",
+        vendor=VENDOR_CISCO,
+        os_family=OS_CISCO_IOS_XE,
+        cvss_base=8.8,
+        in_kev=True,
+        affected_version_description="IOS / IOS XE 15.0 through 16.6.1",
+        description="Buffer overflow in SNMP subsystem allows authenticated remote attackers to execute arbitrary code or trigger unexpected device reload.",
+        precondition_description="SNMP Server configured (snmp-server community/host)",
+        mitigation_cmd="no snmp-server  # or restrict SNMP access with an access-list",
+        version_checker=_check_ios_cve_2017_6742_ver,
+        precondition_checker=lambda f: bool(f.get("snmp_server")),
+        references=["https://nvd.nist.gov/vuln/detail/CVE-2017-6742"],
+    ),
+    PreconditionRule(
+        cve_id="CVE-2018-0171",
+        title="Cisco IOS / IOS XE Smart Install Remote Code Execution",
+        vendor=VENDOR_CISCO,
+        os_family=OS_CISCO_IOS_XE,
+        cvss_base=9.8,
+        in_kev=True,
+        affected_version_description="IOS / IOS XE 12.2 through 16.6.1",
+        description="Buffer overflow in Smart Install client listening on TCP port 4786 allows unauthenticated remote attacker to execute arbitrary code.",
+        precondition_description="Smart Install feature active (vstack enabled)",
+        mitigation_cmd="no vstack",
+        version_checker=_check_ios_cve_2018_0171_ver,
+        precondition_checker=lambda f: bool(f.get("smart_install")),
+        references=["https://nvd.nist.gov/vuln/detail/CVE-2018-0171"],
+    ),
+
+    # ------------------- Fortinet FortiOS -------------------
+    PreconditionRule(
+        cve_id="CVE-2024-21762",
+        title="Fortinet FortiOS SSL-VPN Out-of-Bounds Write Remote Code Execution",
+        vendor=VENDOR_FORTINET,
+        os_family=OS_FORTINET_FORTIOS,
+        cvss_base=9.8,
+        in_kev=True,
+        affected_version_description="FortiOS 7.4.0-7.4.2, 7.2.0-7.2.6, 7.0.0-7.0.13, 6.4.0-6.4.14",
+        description="Out-of-bounds write vulnerability in SSL-VPN web portal allows unauthenticated remote attacker to execute arbitrary code via specially crafted HTTP requests.",
+        precondition_description="SSL-VPN feature enabled (config vpn ssl settings -> set status enable)",
+        mitigation_cmd="config vpn ssl settings -> unset status  # or upgrade to 7.4.3+ / 7.2.7+",
+        version_checker=_check_forti_cve_2024_21762_ver,
+        precondition_checker=lambda f: bool(f.get("ssl_vpn") or f.get("webvpn")),
+        references=["https://nvd.nist.gov/vuln/detail/CVE-2024-21762"],
+    ),
+    PreconditionRule(
+        cve_id="CVE-2023-27997",
+        title="Fortinet FortiOS SSL-VPN Heap Buffer Overflow (XORtigate)",
+        vendor=VENDOR_FORTINET,
+        os_family=OS_FORTINET_FORTIOS,
+        cvss_base=9.8,
+        in_kev=True,
+        affected_version_description="FortiOS 7.2.0-7.2.4, 7.0.0-7.0.11, 6.4.0-6.4.12",
+        description="Heap-based buffer overflow in FortiOS SSL-VPN pre-authentication web interface allows unauthenticated attacker to execute code remotely.",
+        precondition_description="SSL-VPN feature enabled",
+        mitigation_cmd="config vpn ssl settings -> unset status  # or upgrade to 7.2.5+ / 7.0.12+",
+        version_checker=_check_forti_cve_2023_27997_ver,
+        precondition_checker=lambda f: bool(f.get("ssl_vpn") or f.get("webvpn")),
+        references=["https://nvd.nist.gov/vuln/detail/CVE-2023-27997"],
+    ),
+    PreconditionRule(
+        cve_id="CVE-2022-42475",
+        title="Fortinet FortiOS SSL-VPN Heap-Based Buffer Overflow",
+        vendor=VENDOR_FORTINET,
+        os_family=OS_FORTINET_FORTIOS,
+        cvss_base=9.8,
+        in_kev=True,
+        affected_version_description="FortiOS 7.2.0-7.2.2, 7.0.0-7.0.8, 6.4.0-6.4.10",
+        description="Heap-based buffer overflow in SSL-VPN daemons allows remote unauthenticated attackers to execute arbitrary code.",
+        precondition_description="SSL-VPN feature enabled",
+        mitigation_cmd="config vpn ssl settings -> unset status  # upgrade to 7.2.3+ / 7.0.9+",
+        version_checker=_check_forti_cve_2022_42475_ver,
+        precondition_checker=lambda f: bool(f.get("ssl_vpn") or f.get("webvpn")),
+        references=["https://nvd.nist.gov/vuln/detail/CVE-2022-42475"],
+    ),
+    PreconditionRule(
+        cve_id="CVE-2022-40684",
+        title="Fortinet FortiOS Admin Interface Authentication Bypass",
+        vendor=VENDOR_FORTINET,
+        os_family=OS_FORTINET_FORTIOS,
+        cvss_base=9.8,
+        in_kev=True,
+        affected_version_description="FortiOS 7.2.0-7.2.1, 7.0.0-7.0.6",
+        description="Authentication bypass using alternate path in HTTP/HTTPS administrative interface allows remote attackers to perform admin operations.",
+        precondition_description="Administrative Web UI exposed (HTTP/HTTPS admin port)",
+        mitigation_cmd="config firewall local-in-policy -> drop admin access from untrusted interfaces",
+        version_checker=_check_forti_cve_2022_40684_ver,
+        precondition_checker=lambda f: bool(f.get("http_server")),
+        references=["https://nvd.nist.gov/vuln/detail/CVE-2022-40684"],
+    ),
+
+    # ------------------- Palo Alto PAN-OS -------------------
+    PreconditionRule(
+        cve_id="CVE-2024-3400",
+        title="Palo Alto PAN-OS GlobalProtect Command Injection (MidnightEclipse)",
+        vendor=VENDOR_PALOALTO,
+        os_family=OS_PALOALTO_PANOS,
+        cvss_base=10.0,
+        in_kev=True,
+        affected_version_description="PAN-OS 10.2 < 10.2.9, 11.0 < 11.0.4, 11.1 < 11.1.3",
+        description="Command injection in GlobalProtect feature enables unauthenticated remote attacker to execute arbitrary OS commands with root privileges.",
+        precondition_description="GlobalProtect Gateway or Portal active (ssl_vpn)",
+        mitigation_cmd="Disable Device Telemetry temporarily; upgrade to PAN-OS 10.2.9-h1+ / 11.0.4-h1+",
+        version_checker=_check_pan_cve_2024_3400_ver,
+        precondition_checker=lambda f: bool(f.get("ssl_vpn") or f.get("webvpn")),
+        references=["https://nvd.nist.gov/vuln/detail/CVE-2024-3400"],
+    ),
+    PreconditionRule(
+        cve_id="CVE-2022-0028",
+        title="Palo Alto PAN-OS URL Filtering Reflected Denial of Service",
+        vendor=VENDOR_PALOALTO,
+        os_family=OS_PALOALTO_PANOS,
+        cvss_base=8.6,
+        in_kev=True,
+        affected_version_description="PAN-OS 10.1 < 10.1.6-h6, 10.2 < 10.2.2-h2",
+        description="Misconfiguration in URL filtering policy allows remote attackers to conduct reflected amplification DoS attacks.",
+        precondition_description="URL Filtering policy enabled with Source NAT",
+        mitigation_cmd="set rulebase security rules <name> action deny  # upgrade to 10.1.6-h6+ / 10.2.2-h2+",
+        version_checker=_check_pan_cve_2022_0028_ver,
+        precondition_checker=lambda f: True,  # Active by default if URL filtering NAT exists
+        references=["https://nvd.nist.gov/vuln/detail/CVE-2022-0028"],
+    ),
+    PreconditionRule(
+        cve_id="CVE-2020-2021",
+        title="Palo Alto PAN-OS SAML Authentication Bypass",
+        vendor=VENDOR_PALOALTO,
+        os_family=OS_PALOALTO_PANOS,
+        cvss_base=10.0,
+        in_kev=True,
+        affected_version_description="PAN-OS 8.1 <= 8.1.14, 9.0 <= 9.0.8, 9.1 <= 9.1.2",
+        description="Improper verification of cryptographic signature in SAML authentication allows unauthenticated attackers to bypass authentication.",
+        precondition_description="AAA SAML Authentication profile active",
+        mitigation_cmd="Enable 'Validate Identity Provider Certificate' in SAML profile, or upgrade PAN-OS",
+        version_checker=_check_pan_cve_2020_2021_ver,
+        precondition_checker=lambda f: bool(f.get("aaa")),
+        references=["https://nvd.nist.gov/vuln/detail/CVE-2020-2021"],
+    ),
+]

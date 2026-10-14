@@ -1,0 +1,70 @@
+{
+  "generator": "Vuln-Check-Net Engine",
+  "timestamp": "2026-10-14T16:59:17.609606",
+  "devices_count": 1,
+  "results": [
+    {
+      "device_info": {
+        "hostname": "MCC-ASA",
+        "domain_name": "VNMCC.local",
+        "vendor": "Cisco",
+        "os_family": "Cisco ASA",
+        "version": "9.20(3)",
+        "model": "FPR-3105",
+        "features": {
+          "http_server": true,
+          "webvpn": false,
+          "ssl_vpn": false,
+          "snmp_server": false,
+          "telnet": false,
+          "ssh": true,
+          "bgp": false,
+          "ospf": false,
+          "aaa": true,
+          "smart_install": false,
+          "http_outside": true
+        }
+      },
+      "summary": {
+        "total_rules_evaluated": 10,
+        "total_affected_versions": 1,
+        "exploitable_count": 1,
+        "mitigated_count": 0,
+        "critical_count": 1,
+        "high_count": 0,
+        "medium_count": 0,
+        "low_count": 0,
+        "in_kev_count": 1
+      },
+      "vulnerabilities": [
+        {
+          "cve_id": "CVE-2024-20353",
+          "title": "Cisco ASA/FTD Web Server Denial of Service (ArcaneDoor / Line Dancer)",
+          "vendor": "Cisco",
+          "os_family": "Cisco ASA",
+          "status": "EXPLOITABLE",
+          "real_risk": "CRITICAL",
+          "base_score": 8.6,
+          "cvss_vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:N/I:N/A:H",
+          "in_kev": true,
+          "kev_details": {
+            "vulnerability_name": "Cisco ASA and FTD Web Server Denial of Service Vulnerability",
+            "date_added": "2024-04-24",
+            "required_action": "Apply mitigations per vendor instructions or discontinue use of the product if mitigations are unavailable.",
+            "due_date": "2024-05-01",
+            "ransomware_campaign": "Known",
+            "notes": "ArcaneDoor cyber espionage campaign (Line Dancer). https://sec.cloudapps.cisco.com/security/center/content/CiscoSecurityAdvisory/cisco-sa-asaftd-websrvs-dos-X8gNucD2"
+          },
+          "precondition_description": "HTTP Server or WebVPN enabled (http server enable / webvpn)",
+          "precondition_met": true,
+          "mitigation_cmd": "no http 0.0.0.0 0.0.0.0 outside  # remove HTTP listening on external untrusted interfaces",
+          "description": "Cisco Adaptive Security Appliance (ASA) and Firepower Threat Defense (FTD) Web Server Denial of Service Vulnerability (ArcaneDoor / Line Dancer).",
+          "affected_versions": "ASA 9.16 < 9.16.4(57), 9.18 < 9.18.4(22), 9.20 <= 9.20(3)",
+          "references": [
+            "https://nvd.nist.gov/vuln/detail/CVE-2024-20353"
+          ]
+        }
+      ]
+    }
+  ]
+}
