@@ -290,6 +290,14 @@ def handle_update_kev(args: argparse.Namespace) -> None:
         console.print("[yellow]Notice: Could not update from internet. Retaining cached/seed data.[/yellow]")
 
 
+def handle_tui(args: argparse.Namespace) -> None:
+    """Handle `tui` subcommand."""
+    from src.tui.app import VulnCheckApp
+
+    app = VulnCheckApp(initial_file=args.file)
+    app.run()
+
+
 def main() -> None:
     """Main CLI entry point."""
     render_banner()
@@ -317,6 +325,10 @@ def main() -> None:
     # update-kev subcommand
     subparsers.add_parser("update-kev", help="Fetch latest CISA Known Exploited Vulnerabilities catalog")
 
+    # tui subcommand
+    p_tui = subparsers.add_parser("tui", help="Launch interactive Terminal User Interface (TUI)")
+    p_tui.add_argument("--file", "-f", help="Initial configuration file to audit in TUI")
+
     args = parser.parse_args()
 
     if not args.subcommand:
@@ -333,6 +345,8 @@ def main() -> None:
         handle_lookup(args)
     elif args.subcommand == "update-kev":
         handle_update_kev(args)
+    elif args.subcommand == "tui":
+        handle_tui(args)
 
 
 if __name__ == "__main__":
