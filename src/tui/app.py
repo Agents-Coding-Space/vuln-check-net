@@ -10,7 +10,8 @@ from typing import Any, Dict, List, Optional, Tuple
 from rich.text import Text
 from textual.app import App, ComposeResult
 from textual.binding import Binding
-from textual.containers import Horizontal, VerticalScroll
+from textual.containers import Horizontal, Vertical, VerticalScroll
+from textual.screen import ModalScreen
 from textual.widgets import (
     Button,
     DataTable,
@@ -220,6 +221,38 @@ DataTable > .datatable--cursor {
     padding: 0 1;
 }
 
+.detail-container:focus {
+    border: heavy #c084fc;
+    background: #1e1b4b;
+}
+
+/* Detail Action & Hint Bar */
+.detail-header-bar {
+    layout: horizontal;
+    overflow-x: auto;
+    overflow-y: hidden;
+    height: auto;
+    min-height: 3;
+    align-vertical: middle;
+    margin: 0;
+    padding: 0;
+}
+
+.btn-detail-tool {
+    margin: 0 1 0 0;
+    min-width: 4;
+    height: 3;
+}
+
+#btn-vuln-fullscreen, #btn-lookup-fullscreen, #btn-kev-fullscreen {
+    min-width: 17;
+}
+
+.detail-hint-label {
+    margin: 1 0 0 1;
+    color: #94a3b8;
+}
+
 .detail-panel {
     width: 100%;
 }
@@ -323,6 +356,94 @@ Markdown {
 """
 
 
+class DetailScrollContainer(VerticalScroll):
+    """Scrollable container for vulnerability details with keyboard focus affordance."""
+
+    can_focus = True
+
+    BINDINGS = [
+        Binding("escape", "return_to_table", "Back to Table", show=False),
+    ]
+
+    def __init__(self, *children: Any, target_table_id: str = "audit-datatable", **kwargs: Any) -> None:
+        super().__init__(*children, **kwargs)
+        self.target_table_id = target_table_id
+
+    def action_return_to_table(self) -> None:
+        """Return focus to the associated DataTable."""
+        try:
+            table = self.app.query_one(f"#{self.target_table_id}")
+            table.focus()
+        except Exception:
+            pass
+
+
+class VulnerabilityDetailModal(ModalScreen[None]):
+    """Fullscreen modal dialog for comfortable vulnerability inspection and scrolling."""
+
+    BINDINGS = [
+        Binding("escape", "dismiss", "Close", show=True),
+        Binding("v", "dismiss", "Close [V]", show=False),
+        Binding("q", "dismiss", "Close [Q]", show=False),
+    ]
+
+    DEFAULT_CSS = """
+    VulnerabilityDetailModal {
+        align: center middle;
+        background: rgba(0, 0, 0, 0.75);
+    }
+
+    #modal-dialog {
+        width: 90%;
+        height: 85%;
+        border: thick #38bdf8;
+        background: #0f172a;
+        padding: 1 2;
+    }
+
+    #modal-header {
+        height: 3;
+        dock: top;
+        layout: horizontal;
+        margin-bottom: 1;
+        border-bottom: solid #334155;
+    }
+
+    #modal-title {
+        width: 1fr;
+        color: #38bdf8;
+        text-style: bold;
+        content-align: left middle;
+    }
+
+    #btn-modal-close {
+        min-width: 14;
+    }
+
+    #modal-scroll {
+        width: 100%;
+        height: 1fr;
+    }
+    """
+
+    def __init__(self, markdown_text: str, title: str = "Vulnerability Full Details") -> None:
+        super().__init__()
+        self.markdown_text = markdown_text
+        self.dialog_title = title
+
+    def compose(self) -> ComposeResult:
+        with Vertical(id="modal-dialog"):
+            with Horizontal(id="modal-header"):
+                yield Label(self.dialog_title, id="modal-title")
+                yield Button("[Esc] Close", id="btn-modal-close", variant="primary")
+            with VerticalScroll(id="modal-scroll"):
+                yield Markdown(self.markdown_text, id="modal-markdown")
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "btn-modal-close":
+            self.dismiss()
+
+
 class VulnCheckApp(App):
     """Interactive Terminal User Interface for Vuln-Check-Net."""
 
@@ -337,6 +458,11 @@ class VulnCheckApp(App):
         Binding("ctrl+l", "tab_lookup", "Version Lookup", show=True, priority=True),
         Binding("ctrl+k", "tab_kev", "KEV Explorer", show=True, priority=True),
         Binding("ctrl+e", "export_all", "Export", show=True, priority=True),
+        Binding("v", "view_fullscreen", "Full Details [V]", show=True),
+        Binding("alt+down", "scroll_detail_down", "Scroll Detail ↓", show=True),
+        Binding("alt+up", "scroll_detail_up", "Scroll Detail ↑", show=True),
+        Binding("alt+pagedown", "page_detail_down", "Detail Page ↓", show=False),
+        Binding("alt+pageup", "page_detail_up", "Detail Page ↑", show=False),
     ]
 
     def __init__(self, initial_file: Optional[str] = None) -> None:
@@ -417,8 +543,23 @@ class VulnCheckApp(App):
                 # DataTable for audit findings
                 yield DataTable(id="audit-datatable")
 
+                # Detail Action & Hint Bar
+                with Horizontal(id="vuln-detail-header-bar", classes="detail-header-bar"):
+                    yield Button("[V] Full Details", id="btn-vuln-fullscreen", classes="btn-detail-tool")
+                    yield Button("↑", id="btn-vuln-scroll-up", classes="btn-detail-tool")
+                    yield Button("↓", id="btn-vuln-scroll-down", classes="btn-detail-tool")
+                    yield Label(
+                        "[dim]Enter/Click to Focus • ↑/↓ or Alt+↑/↓ to Scroll • Esc to return to Table[/dim]",
+                        id="lbl-vuln-hints",
+                        classes="detail-hint-label",
+                    )
+
                 # Vulnerability detail panel
-                with VerticalScroll(id="vuln-detail-container", classes="detail-container"):
+                with DetailScrollContainer(
+                    id="vuln-detail-container",
+                    classes="detail-container",
+                    target_table_id="audit-datatable",
+                ):
                     yield Markdown(
                         "*Select a vulnerability from the table to view full details, precondition evidence, and mitigation playbook.*",
                         id="detail-content",
@@ -444,7 +585,22 @@ class VulnCheckApp(App):
                     id="lookup-summary-card",
                 )
                 yield DataTable(id="table-lookup-vulns")
-                with VerticalScroll(id="lookup-detail-container", classes="detail-container"):
+
+                with Horizontal(id="lookup-detail-header-bar", classes="detail-header-bar"):
+                    yield Button("[V] Full Details", id="btn-lookup-fullscreen", classes="btn-detail-tool")
+                    yield Button("↑", id="btn-lookup-scroll-up", classes="btn-detail-tool")
+                    yield Button("↓", id="btn-lookup-scroll-down", classes="btn-detail-tool")
+                    yield Label(
+                        "[dim]Enter/Click to Focus • ↑/↓ or Alt+↑/↓ to Scroll • Esc to return to Table[/dim]",
+                        id="lbl-lookup-hints",
+                        classes="detail-hint-label",
+                    )
+
+                with DetailScrollContainer(
+                    id="lookup-detail-container",
+                    classes="detail-container",
+                    target_table_id="table-lookup-vulns",
+                ):
                     yield Static(
                         "[dim]Select a vulnerability from the table to view potential risk and mitigation commands.[/dim]",
                         id="lookup-detail-panel",
@@ -472,7 +628,22 @@ class VulnCheckApp(App):
                     yield Button("Ransomware Only", id="btn-filter-ransomware", classes="btn-filter")
 
                 yield DataTable(id="table-kev")
-                with VerticalScroll(id="kev-detail-container", classes="detail-container"):
+
+                with Horizontal(id="kev-detail-header-bar", classes="detail-header-bar"):
+                    yield Button("[V] Full Details", id="btn-kev-fullscreen", classes="btn-detail-tool")
+                    yield Button("↑", id="btn-kev-scroll-up", classes="btn-detail-tool")
+                    yield Button("↓", id="btn-kev-scroll-down", classes="btn-detail-tool")
+                    yield Label(
+                        "[dim]Enter/Click to Focus • ↑/↓ or Alt+↑/↓ to Scroll • Esc to return to Table[/dim]",
+                        id="lbl-kev-hints",
+                        classes="detail-hint-label",
+                    )
+
+                with DetailScrollContainer(
+                    id="kev-detail-container",
+                    classes="detail-container",
+                    target_table_id="table-kev",
+                ):
                     yield Markdown(
                         "*Select a KEV entry from the table to view remediation actions and intelligence.*",
                         id="kev-detail-content",
@@ -538,6 +709,109 @@ class VulnCheckApp(App):
     def action_tab_kev(self) -> None:
         """Switch to CISA KEV Explorer tab."""
         self.query_one("#main-tabs", TabbedContent).active = "tab-kev"
+
+    def _get_active_detail_container(self) -> Optional[VerticalScroll]:
+        """Find the detail container for the currently active tab."""
+        try:
+            tabs = self.query_one("#main-tabs", TabbedContent)
+            active_tab = tabs.active
+            if active_tab == "tab-audit":
+                return self.query_one("#vuln-detail-container", VerticalScroll)
+            elif active_tab == "tab-lookup":
+                return self.query_one("#lookup-detail-container", VerticalScroll)
+            elif active_tab == "tab-kev":
+                return self.query_one("#kev-detail-container", VerticalScroll)
+        except Exception:
+            pass
+        return None
+
+    def action_scroll_detail_down(self) -> None:
+        """Scroll active detail panel down by 3 lines."""
+        container = self._get_active_detail_container()
+        if container:
+            container.scroll_relative(y=3, animate=False)
+
+    def action_scroll_detail_up(self) -> None:
+        """Scroll active detail panel up by 3 lines."""
+        container = self._get_active_detail_container()
+        if container:
+            container.scroll_relative(y=-3, animate=False)
+
+    def action_page_detail_down(self) -> None:
+        """Scroll active detail panel down by one page."""
+        container = self._get_active_detail_container()
+        if container:
+            container.scroll_page_down(animate=False)
+
+    def action_page_detail_up(self) -> None:
+        """Scroll active detail panel up by one page."""
+        container = self._get_active_detail_container()
+        if container:
+            container.scroll_page_up(animate=False)
+
+    def action_view_fullscreen(self) -> None:
+        """Open fullscreen modal to comfortably inspect vulnerability details."""
+        try:
+            tabs = self.query_one("#main-tabs", TabbedContent)
+            active_tab = tabs.active
+        except Exception:
+            active_tab = "tab-audit"
+
+        title = "Vulnerability Details"
+        md_text = ""
+
+        if active_tab == "tab-audit":
+            try:
+                table = self.query_one("#audit-datatable", DataTable)
+                if table.row_count > 0 and table.cursor_row is not None:
+                    row_key = table.coordinate_to_cell_key((table.cursor_row, 0)).row_key.value
+                    if row_key and str(row_key) in self.audit_vulns_map:
+                        v = self.audit_vulns_map[str(row_key)]
+                        title = f"{v.get('cve_id', 'Vulnerability')} — {v.get('title', '')}"
+            except Exception:
+                pass
+            try:
+                md_widget = self.query_one("#detail-content", Markdown)
+                md_text = md_widget.source
+            except Exception:
+                pass
+
+        elif active_tab == "tab-lookup":
+            try:
+                table = self.query_one("#table-lookup-vulns", DataTable)
+                if table.row_count > 0 and table.cursor_row is not None:
+                    row_key = table.coordinate_to_cell_key((table.cursor_row, 0)).row_key.value
+                    if row_key and str(row_key) in self.lookup_vulns_map:
+                        v = self.lookup_vulns_map[str(row_key)]
+                        title = f"{v.get('cve_id', 'Lookup')} — {v.get('title', '')}"
+            except Exception:
+                pass
+            try:
+                static_widget = self.query_one("#lookup-detail-panel", Static)
+                md_text = str(static_widget.render())
+            except Exception:
+                pass
+
+        elif active_tab == "tab-kev":
+            try:
+                table = self.query_one("#table-kev", DataTable)
+                if table.row_count > 0 and table.cursor_row is not None:
+                    row_key = table.coordinate_to_cell_key((table.cursor_row, 0)).row_key.value
+                    if row_key and str(row_key) in self.kev_records_map:
+                        rec = self.kev_records_map[str(row_key)]
+                        title = f"{rec.get('cveID', 'KEV')} — {rec.get('vulnerabilityName', '')}"
+            except Exception:
+                pass
+            try:
+                md_widget = self.query_one("#kev-detail-content", Markdown)
+                md_text = md_widget.source
+            except Exception:
+                pass
+
+        if not md_text:
+            md_text = "*No vulnerability details available to view in fullscreen.*"
+
+        self.push_screen(VulnerabilityDetailModal(md_text, title))
 
     def action_scan_file(self) -> None:
         """Trigger scan on file path in input box."""
@@ -611,6 +885,14 @@ class VulnCheckApp(App):
                 return
             self.scan_file_path(path)
 
+        # 2b. Detail Header buttons (fullscreen & scrolling)
+        elif bid in ("btn-vuln-fullscreen", "btn-lookup-fullscreen", "btn-kev-fullscreen"):
+            self.action_view_fullscreen()
+        elif bid in ("btn-vuln-scroll-up", "btn-lookup-scroll-up", "btn-kev-scroll-up"):
+            self.action_scroll_detail_up()
+        elif bid in ("btn-vuln-scroll-down", "btn-lookup-scroll-down", "btn-kev-scroll-down"):
+            self.action_scroll_detail_down()
+
         # 3. Export buttons
         elif bid == "btn-export-md":
             self._export_format("md")
@@ -678,7 +960,20 @@ class VulnCheckApp(App):
 
     def on_data_table_row_selected(self, event: DataTable.RowSelected) -> None:
         """Handle row click or Enter in any DataTable."""
-        self._handle_table_selection(event.data_table.id, event.row_key.value if event.row_key else None)
+        table_id = event.data_table.id
+        row_key = event.row_key.value if event.row_key else None
+        self._handle_table_selection(table_id, row_key)
+
+        # Automatically transfer focus into the corresponding detail container
+        try:
+            if table_id == "audit-datatable":
+                self.query_one("#vuln-detail-container").focus()
+            elif table_id == "table-lookup-vulns":
+                self.query_one("#lookup-detail-container").focus()
+            elif table_id == "table-kev":
+                self.query_one("#kev-detail-container").focus()
+        except Exception:
+            pass
 
     def _handle_table_selection(self, table_id: Optional[str], key: Optional[str]) -> None:
         """Update detail panel according to active table selection."""
@@ -696,16 +991,22 @@ class VulnCheckApp(App):
                     )
                     panel = self.query_one("#detail-content", Markdown)
                     panel.update(self._render_vuln_detail(self.audit_vulns_map[key_str], dev_info))
+                    container = self.query_one("#vuln-detail-container", VerticalScroll)
+                    container.scroll_to(y=0, animate=False)
 
             elif table_id == "table-lookup-vulns":
                 if key_str in self.lookup_vulns_map:
                     panel = self.query_one("#lookup-detail-panel", Static)
                     panel.update(self._render_lookup_detail(self.lookup_vulns_map[key_str]))
+                    container = self.query_one("#lookup-detail-container", VerticalScroll)
+                    container.scroll_to(y=0, animate=False)
 
             elif table_id == "table-kev":
                 if key_str in self.kev_records_map:
                     panel = self.query_one("#kev-detail-content", Markdown)
                     panel.update(self._render_kev_detail(self.kev_records_map[key_str]))
+                    container = self.query_one("#kev-detail-container", VerticalScroll)
+                    container.scroll_to(y=0, animate=False)
         except Exception:
             return
 
@@ -800,6 +1101,7 @@ class VulnCheckApp(App):
         if vulns:
             table.move_cursor(row=0)
             detail_panel.update(self._render_vuln_detail(vulns[0], dev_info))
+            self.query_one("#vuln-detail-container", VerticalScroll).scroll_to(y=0, animate=False)
         else:
             detail_panel.update(
                 "*No vulnerabilities matched this device OS version and configuration.*"
@@ -1074,6 +1376,7 @@ class VulnCheckApp(App):
         if results:
             table.move_cursor(row=0)
             detail_panel.update(self._render_lookup_detail(results[0]))
+            self.query_one("#lookup-detail-container", VerticalScroll).scroll_to(y=0, animate=False)
         else:
             detail_panel.update(
                 f"[bold green]✔ No known CVE rules match {os_family} version {version_str}.[/bold green]"
@@ -1192,6 +1495,7 @@ class VulnCheckApp(App):
         if filtered:
             table.move_cursor(row=0)
             detail.update(self._render_kev_detail(filtered[0]))
+            self.query_one("#kev-detail-container", VerticalScroll).scroll_to(y=0, animate=False)
         else:
             detail.update("*No KEV records match the current filter query.*")
 

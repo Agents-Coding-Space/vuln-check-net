@@ -2,10 +2,11 @@
 
 from pathlib import Path
 import pytest
+from textual.containers import VerticalScroll
 from textual.widgets import Button, DataTable, Input, Markdown, Static, TabbedContent
 
 from src.config import OUTPUTS_DIR
-from src.tui.app import VulnCheckApp
+from src.tui.app import DetailScrollContainer, VulnerabilityDetailModal, VulnCheckApp
 
 ASA_PATH = Path("F:/WORK/NCS_Downloads/Network config/Firewall ASA1.txt")
 IOS_XE_PATH = Path("F:/WORK/NCS_Downloads/cisco_ios_xe_sample_config.txt")
@@ -447,4 +448,112 @@ def test_tui_markdown_detail_tables():
     assert "| **Ngày công bố KEV** | `2024-04-24` |" in kev_md
     assert "| **Hạn chót xử lý** | `2024-05-15` |" in kev_md
     assert "| **Chiến dịch Ransomware** | `Known` |" in kev_md
+
+
+@pytest.mark.asyncio
+async def test_tui_scroll_detail_focus_and_actions(tmp_path):
+    """Verify Enter on DataTable transfers focus to detail container, arrow keys scroll, and Escape returns focus."""
+    asa_file = tmp_path / "test_scroll_asa.txt"
+    asa_file.write_text(SAMPLE_ASA_CONFIG.strip(), encoding="utf-8")
+
+    app = VulnCheckApp()
+    async with app.run_test() as pilot:
+        # Scan ASA configuration
+        inp = pilot.app.query_one("#input-config-path", Input)
+        inp.value = str(asa_file)
+        btn_scan = pilot.app.query_one("#btn-scan", Button)
+        btn_scan.press()
+        await pilot.pause()
+
+        audit_table = pilot.app.query_one("#audit-datatable", DataTable)
+        assert audit_table.row_count >= 1
+
+        # Focus DataTable
+        audit_table.focus()
+        await pilot.pause()
+        assert pilot.app.focused == audit_table
+
+        # 1. Press Enter on DataTable row -> focus transfers to vuln-detail-container
+        await pilot.press("enter")
+        await pilot.pause()
+
+        detail_container = pilot.app.query_one("#vuln-detail-container", VerticalScroll)
+        assert pilot.app.focused == detail_container
+
+        # 2. Press down/pagedown to scroll details
+        initial_y = detail_container.scroll_y
+        assert detail_container.max_scroll_y > 0
+        await pilot.press("pagedown")
+        await pilot.pause()
+        assert detail_container.scroll_y > initial_y
+
+        # 3. Press Escape -> focus returns to audit-datatable
+        await pilot.press("escape")
+        await pilot.pause()
+        assert pilot.app.focused == audit_table
+
+        # 4. Global scroll actions work regardless of focus
+        y_before = detail_container.scroll_y
+        pilot.app.action_scroll_detail_down()
+        await pilot.pause()
+        assert detail_container.scroll_y > y_before
+
+        pilot.app.action_scroll_detail_up()
+        await pilot.pause()
+        assert detail_container.scroll_y < detail_container.max_scroll_y
+
+
+@pytest.mark.asyncio
+async def test_tui_fullscreen_modal(tmp_path):
+    """Verify pressing 'v' or clicking Full Details opens VulnerabilityDetailModal, and Escape closes it."""
+    asa_file = tmp_path / "test_modal_asa.txt"
+    asa_file.write_text(SAMPLE_ASA_CONFIG.strip(), encoding="utf-8")
+
+    app = VulnCheckApp()
+    async with app.run_test() as pilot:
+        # Scan ASA configuration
+        inp = pilot.app.query_one("#input-config-path", Input)
+        inp.value = str(asa_file)
+        btn_scan = pilot.app.query_one("#btn-scan", Button)
+        btn_scan.press()
+        await pilot.pause()
+
+        assert len(pilot.app.screen_stack) == 1
+
+        # 1. Press 'v' key to open fullscreen modal
+        await pilot.press("v")
+        await pilot.pause()
+
+        assert len(pilot.app.screen_stack) == 2
+        modal_screen = pilot.app.screen
+        assert isinstance(modal_screen, VulnerabilityDetailModal)
+
+        # Inspect Markdown content in modal
+        modal_md = modal_screen.query_one("#modal-markdown", Markdown)
+        assert "CVE-2024-20353" in modal_md.source or "CVE-2023-20269" in modal_md.source
+        assert "Precondition" in modal_md.source
+
+        # 2. Press Escape to close modal
+        await pilot.press("escape")
+        await pilot.pause()
+
+        assert len(pilot.app.screen_stack) == 1
+        assert not isinstance(pilot.app.screen, VulnerabilityDetailModal)
+
+        # 3. Test opening via [V] Full Details button and closing via [Esc] Close button
+        btn_fullscreen = pilot.app.query_one("#btn-vuln-fullscreen", Button)
+        btn_fullscreen.press()
+        await pilot.pause()
+
+        assert len(pilot.app.screen_stack) == 2
+        modal_screen2 = pilot.app.screen
+        assert isinstance(modal_screen2, VulnerabilityDetailModal)
+
+        btn_close = modal_screen2.query_one("#btn-modal-close", Button)
+        btn_close.press()
+        await pilot.pause()
+
+        assert len(pilot.app.screen_stack) == 1
+        assert not isinstance(pilot.app.screen, VulnerabilityDetailModal)
+
 
