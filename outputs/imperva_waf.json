@@ -1,0 +1,97 @@
+{
+  "generator": "Vuln-Check-Net Engine",
+  "timestamp": "2026-10-15T10:51:52.446288",
+  "devices_count": 1,
+  "results": [
+    {
+      "device_info": {
+        "hostname": "impv-mx-hn-01.example.vn",
+        "domain_name": "",
+        "vendor": "Imperva",
+        "os_family": "imperva_securesphere",
+        "version": "14.7.0.20",
+        "model": "SecureSphere WAF / MX Management Server",
+        "features": {
+          "http_server": true,
+          "ssh": true,
+          "snmp_server": true,
+          "webvpn": false,
+          "ssl_vpn": false,
+          "telnet": false,
+          "bgp": false,
+          "ospf": false,
+          "aaa": true,
+          "smart_install": false,
+          "http_outside": false
+        }
+      },
+      "summary": {
+        "total_rules_evaluated": 2,
+        "total_affected_versions": 2,
+        "exploitable_count": 2,
+        "mitigated_count": 0,
+        "critical_count": 2,
+        "high_count": 0,
+        "medium_count": 0,
+        "low_count": 0,
+        "in_kev_count": 2
+      },
+      "vulnerabilities": [
+        {
+          "cve_id": "CVE-2023-38646",
+          "title": "Imperva SecureSphere Management Server Remote Command Execution / Auth Bypass",
+          "vendor": "Imperva",
+          "os_family": "imperva_securesphere",
+          "status": "EXPLOITABLE",
+          "real_risk": "CRITICAL",
+          "base_score": 8.8,
+          "cvss_vector": "",
+          "in_kev": true,
+          "kev_details": {
+            "vulnerability_name": "Imperva SecureSphere Management Server Remote Command Execution / Auth Bypass Vulnerability",
+            "date_added": "2023-08-01",
+            "required_action": "Apply updates per vendor instructions.",
+            "due_date": "2023-08-22",
+            "ransomware_campaign": "Known",
+            "notes": "https://www.imperva.com/trust-center/security-advisories/"
+          },
+          "precondition_description": "HTTP Web GUI interface active (webGuiPort configured)",
+          "precondition_met": true,
+          "mitigation_cmd": "Restrict Web GUI access via firewall rules or upgrade SecureSphere to 14.8.0+",
+          "description": "Authentication bypass and remote code execution vulnerability in Imperva SecureSphere MX Management Server web administration console.",
+          "affected_versions": "SecureSphere < 14.8.0",
+          "references": [
+            "https://www.imperva.com/trust-center/security-advisories/"
+          ]
+        },
+        {
+          "cve_id": "CVE-2022-38753",
+          "title": "Imperva SecureSphere Management Console Command Injection",
+          "vendor": "Imperva",
+          "os_family": "imperva_securesphere",
+          "status": "EXPLOITABLE",
+          "real_risk": "CRITICAL",
+          "base_score": 8.8,
+          "cvss_vector": "",
+          "in_kev": true,
+          "kev_details": {
+            "vulnerability_name": "Imperva SecureSphere Management Console Command Injection Vulnerability",
+            "date_added": "2022-10-15",
+            "required_action": "Apply updates per vendor instructions.",
+            "due_date": "2022-11-05",
+            "ransomware_campaign": "Known",
+            "notes": "https://www.imperva.com/trust-center/security-advisories/"
+          },
+          "precondition_description": "HTTP Web GUI interface active (webGuiPort configured)",
+          "precondition_met": true,
+          "mitigation_cmd": "Restrict management access to isolated management network and upgrade to 14.8.0+",
+          "description": "Command injection vulnerability in SecureSphere WAF management interface allows remote attackers to execute arbitrary system commands.",
+          "affected_versions": "SecureSphere < 14.8.0",
+          "references": [
+            "https://www.imperva.com/trust-center/security-advisories/"
+          ]
+        }
+      ]
+    }
+  ]
+}

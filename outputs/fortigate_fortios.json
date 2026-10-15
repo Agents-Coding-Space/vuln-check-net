@@ -1,0 +1,70 @@
+{
+  "generator": "Vuln-Check-Net Engine",
+  "timestamp": "2026-10-15T10:51:58.443504",
+  "devices_count": 1,
+  "results": [
+    {
+      "device_info": {
+        "hostname": "FGT-DC-PERIMETER-01",
+        "domain_name": "",
+        "vendor": "Fortinet",
+        "os_family": "Fortinet FortiOS",
+        "version": "7.4.2",
+        "model": "FG200F",
+        "features": {
+          "http_server": true,
+          "webvpn": false,
+          "ssl_vpn": false,
+          "snmp_server": true,
+          "telnet": true,
+          "ssh": true,
+          "bgp": false,
+          "ospf": false,
+          "aaa": false,
+          "smart_install": false,
+          "http_outside": false
+        }
+      },
+      "summary": {
+        "total_rules_evaluated": 4,
+        "total_affected_versions": 1,
+        "exploitable_count": 0,
+        "mitigated_count": 1,
+        "critical_count": 0,
+        "high_count": 0,
+        "medium_count": 0,
+        "low_count": 1,
+        "in_kev_count": 1
+      },
+      "vulnerabilities": [
+        {
+          "cve_id": "CVE-2024-21762",
+          "title": "Fortinet FortiOS SSL-VPN Out-of-Bounds Write Remote Code Execution",
+          "vendor": "Fortinet",
+          "os_family": "Fortinet FortiOS",
+          "status": "MITIGATED",
+          "real_risk": "LOW",
+          "base_score": 9.8,
+          "cvss_vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H",
+          "in_kev": true,
+          "kev_details": {
+            "vulnerability_name": "Fortinet FortiOS Out-of-Bounds Write Vulnerability",
+            "date_added": "2024-02-09",
+            "required_action": "Apply mitigations per vendor instructions or discontinue use of the product if mitigations are unavailable.",
+            "due_date": "2024-02-16",
+            "ransomware_campaign": "Known",
+            "notes": "Actively exploited in the wild. https://fortiguard.com/psirt/FG-IR-24-015"
+          },
+          "precondition_description": "SSL-VPN feature enabled (config vpn ssl settings -> set status enable)",
+          "precondition_met": false,
+          "mitigation_cmd": "config vpn ssl settings -> unset status  # or upgrade to 7.4.3+ / 7.2.7+",
+          "description": "Fortinet FortiOS Out-of-Bounds Write in SSL-VPN web portal allowing unauthenticated remote code execution.",
+          "affected_versions": "FortiOS 7.4.0-7.4.2, 7.2.0-7.2.6, 7.0.0-7.0.13, 6.4.0-6.4.14",
+          "references": [
+            "https://nvd.nist.gov/vuln/detail/CVE-2024-21762"
+          ]
+        }
+      ]
+    }
+  ]
+}

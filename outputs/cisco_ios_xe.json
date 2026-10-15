@@ -1,0 +1,97 @@
+{
+  "generator": "Vuln-Check-Net Engine",
+  "timestamp": "2026-10-15T10:51:17.865547",
+  "devices_count": 1,
+  "results": [
+    {
+      "device_info": {
+        "hostname": "CORE-RTR-HN-01",
+        "domain_name": "corp.example.vn",
+        "vendor": "Cisco",
+        "os_family": "Cisco IOS XE",
+        "version": "17.6",
+        "model": "Unknown",
+        "features": {
+          "http_server": true,
+          "webvpn": false,
+          "ssl_vpn": false,
+          "snmp_server": true,
+          "telnet": true,
+          "ssh": true,
+          "bgp": false,
+          "ospf": true,
+          "aaa": false,
+          "smart_install": false,
+          "http_outside": false
+        }
+      },
+      "summary": {
+        "total_rules_evaluated": 4,
+        "total_affected_versions": 2,
+        "exploitable_count": 2,
+        "mitigated_count": 0,
+        "critical_count": 2,
+        "high_count": 0,
+        "medium_count": 0,
+        "low_count": 0,
+        "in_kev_count": 2
+      },
+      "vulnerabilities": [
+        {
+          "cve_id": "CVE-2023-20198",
+          "title": "Cisco IOS XE Web UI Privilege Escalation",
+          "vendor": "Cisco",
+          "os_family": "Cisco IOS XE",
+          "status": "EXPLOITABLE",
+          "real_risk": "CRITICAL",
+          "base_score": 10.0,
+          "cvss_vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H",
+          "in_kev": true,
+          "kev_details": {
+            "vulnerability_name": "Cisco IOS XE Web UI Privilege Escalation Vulnerability",
+            "date_added": "2023-10-16",
+            "required_action": "Apply updates per vendor instructions or disable the HTTP Server feature on internet-facing systems.",
+            "due_date": "2023-10-20",
+            "ransomware_campaign": "Known",
+            "notes": "Widely exploited in the wild. https://sec.cloudapps.cisco.com/security/center/content/CiscoSecurityAdvisory/cisco-sa-iosxe-webui-privesc-j22SaAqp"
+          },
+          "precondition_description": "HTTP or HTTPS server enabled (ip http server / ip http secure-server)",
+          "precondition_met": true,
+          "mitigation_cmd": "no ip http server ; no ip http secure-server",
+          "description": "Cisco IOS XE Web UI Feature Privilege Escalation Vulnerability leading to arbitrary level 15 user creation.",
+          "affected_versions": "IOS XE 16.1.1 through 17.12.1",
+          "references": [
+            "https://nvd.nist.gov/vuln/detail/CVE-2023-20198"
+          ]
+        },
+        {
+          "cve_id": "CVE-2023-20273",
+          "title": "Cisco IOS XE Web UI Command Injection",
+          "vendor": "Cisco",
+          "os_family": "Cisco IOS XE",
+          "status": "EXPLOITABLE",
+          "real_risk": "CRITICAL",
+          "base_score": 7.2,
+          "cvss_vector": "CVSS:3.1/AV:N/AC:L/PR:H/UI:N/S:U/C:H/I:H/A:H",
+          "in_kev": true,
+          "kev_details": {
+            "vulnerability_name": "Cisco IOS XE Web UI Command Injection Vulnerability",
+            "date_added": "2023-10-23",
+            "required_action": "Apply updates per vendor instructions.",
+            "due_date": "2023-10-27",
+            "ransomware_campaign": "Known",
+            "notes": "Chained with CVE-2023-20198. https://sec.cloudapps.cisco.com/security/center/content/CiscoSecurityAdvisory/cisco-sa-iosxe-webui-privesc-j22SaAqp"
+          },
+          "precondition_description": "HTTP or HTTPS server enabled (ip http server / ip http secure-server)",
+          "precondition_met": true,
+          "mitigation_cmd": "no ip http server ; no ip http secure-server",
+          "description": "Cisco IOS XE Web UI Command Injection Vulnerability chained with privilege escalation for root access.",
+          "affected_versions": "IOS XE 16.1.1 through 17.12.1",
+          "references": [
+            "https://nvd.nist.gov/vuln/detail/CVE-2023-20273"
+          ]
+        }
+      ]
+    }
+  ]
+}

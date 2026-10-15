@@ -8,13 +8,19 @@ from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List
 
 from src.config import (
+    OS_ARBOR_ARBOS,
     OS_CISCO_ASA,
     OS_CISCO_IOS_CLASSIC,
     OS_CISCO_IOS_XE,
+    OS_F5_BIGIP,
     OS_FORTINET_FORTIOS,
+    OS_IMPERVA_SECURESPHERE,
     OS_PALOALTO_PANOS,
     VENDOR_CISCO,
+    VENDOR_F5,
     VENDOR_FORTINET,
+    VENDOR_IMPERVA,
+    VENDOR_NETSCOUT,
     VENDOR_PALOALTO,
 )
 from src.version_utils import compare_versions, is_version_in_range
@@ -236,7 +242,63 @@ def _check_pan_cve_2020_2021_ver(v: str) -> bool:
 
 
 # ==============================================================================
-# PRECONDITION RULES LIST (21 Total)
+# 5. F5 BIG-IP RULES
+# ==============================================================================
+
+def _check_f5_cve_2023_46747_ver(v: str) -> bool:
+    """CVE-2023-46747 affects F5 BIG-IP 17.1.0-17.1.1, 16.1.0-16.1.4, 15.1.0-15.1.10."""
+    if is_version_in_range(v, "17.1.0", "17.1.1.1", True, False):
+        return True
+    if is_version_in_range(v, "16.1.0", "16.1.4.1", True, False):
+        return True
+    if is_version_in_range(v, "15.1.0", "15.1.10.2", True, False):
+        return True
+    return False
+
+
+def _check_f5_cve_2020_5902_ver(v: str) -> bool:
+    """CVE-2020-5902 affects F5 BIG-IP 11.6.1 through 15.1.0."""
+    return is_version_in_range(v, "11.6.1", "15.1.0.4", True, False)
+
+
+def _check_f5_cve_2022_1388_ver(v: str) -> bool:
+    """CVE-2022-1388 affects F5 BIG-IP 13.1.0 through 16.1.2."""
+    return is_version_in_range(v, "13.1.0", "16.1.2.2", True, False)
+
+
+# ==============================================================================
+# 6. NETSCOUT ARBOR SIGHTLINE / TMS RULES
+# ==============================================================================
+
+def _check_arbor_cve_2020_24368_ver(v: str) -> bool:
+    """CVE-2020-24368 affects Sightline < 9.8.0, ArbOS < 7.8.0."""
+    if is_version_in_range(v, "9.0.0", "9.8.0", True, False):
+        return True
+    if is_version_in_range(v, "7.0.0", "7.8.0", True, False):
+        return True
+    if compare_versions(v, "9.8.0") < 0 and compare_versions(v, "8.0.0") >= 0:
+        return True
+    if compare_versions(v, "7.8.0") < 0 and compare_versions(v, "6.0.0") >= 0:
+        return True
+    return False
+
+
+# ==============================================================================
+# 7. IMPERVA SECURESPHERE WAF RULES
+# ==============================================================================
+
+def _check_imperva_cve_2023_38646_ver(v: str) -> bool:
+    """CVE-2023-38646 affects SecureSphere < 14.8.0."""
+    return is_version_in_range(v, "10.0.0", "14.8.0", True, False)
+
+
+def _check_imperva_cve_2022_38753_ver(v: str) -> bool:
+    """CVE-2022-38753 affects SecureSphere < 14.8.0."""
+    return is_version_in_range(v, "10.0.0", "14.8.0", True, False)
+
+
+# ==============================================================================
+# PRECONDITION RULES LIST (27 Total)
 # ==============================================================================
 
 PRECONDITION_RULES: List[PreconditionRule] = [
@@ -561,5 +623,101 @@ PRECONDITION_RULES: List[PreconditionRule] = [
         version_checker=_check_pan_cve_2020_2021_ver,
         precondition_checker=lambda f: bool(f.get("aaa")),
         references=["https://nvd.nist.gov/vuln/detail/CVE-2020-2021"],
+    ),
+
+    # ------------------- F5 BIG-IP -------------------
+    PreconditionRule(
+        cve_id="CVE-2023-46747",
+        title="F5 BIG-IP Configuration Utility (TMUI) Authentication Bypass & RCE",
+        vendor=VENDOR_F5,
+        os_family=OS_F5_BIGIP,
+        cvss_base=9.8,
+        in_kev=True,
+        affected_version_description="BIG-IP 17.1.0 - 17.1.1, 16.1.0 - 16.1.4, 15.1.0 - 15.1.10",
+        description="Authentication bypass vulnerability in the Traffic Management User Interface (TMUI) allows unauthenticated remote attackers with network access to execute arbitrary system commands via AJP request smuggling.",
+        precondition_description="HTTP Server / Management GUI enabled (sys httpd)",
+        mitigation_cmd="tmsh modify sys httpd allow replace-all-with { 10.0.0.0/8 }  # or apply hotfix script K000137353",
+        version_checker=_check_f5_cve_2023_46747_ver,
+        precondition_checker=lambda f: bool(f.get("http_server")),
+        references=["https://my.f5.com/manage/s/article/K000137353"],
+    ),
+    PreconditionRule(
+        cve_id="CVE-2020-5902",
+        title="F5 BIG-IP TMUI Remote Code Execution Vulnerability",
+        vendor=VENDOR_F5,
+        os_family=OS_F5_BIGIP,
+        cvss_base=9.8,
+        in_kev=True,
+        affected_version_description="BIG-IP 11.6.1 - 15.1.0",
+        description="Undisclosed pages in the Traffic Management User Interface (TMUI) allow unauthenticated remote attackers to execute arbitrary system commands, create or delete files, and disable services.",
+        precondition_description="HTTP Server / Management GUI enabled (sys httpd)",
+        mitigation_cmd="Restrict access to TMUI interface or upgrade to fixed release (15.1.0.4+ / 14.1.2.6+)",
+        version_checker=_check_f5_cve_2020_5902_ver,
+        precondition_checker=lambda f: bool(f.get("http_server")),
+        references=["https://support.f5.com/csp/article/K52145254"],
+    ),
+    PreconditionRule(
+        cve_id="CVE-2022-1388",
+        title="F5 BIG-IP iControl REST Authentication Bypass & Command Execution",
+        vendor=VENDOR_F5,
+        os_family=OS_F5_BIGIP,
+        cvss_base=9.8,
+        in_kev=True,
+        affected_version_description="BIG-IP 13.1.0 - 16.1.2",
+        description="iControl REST authentication component flaw allows unauthenticated remote attackers with network access to execute arbitrary system commands with root privileges.",
+        precondition_description="HTTP Server / Management GUI enabled (sys httpd)",
+        mitigation_cmd="Block iControl REST access through self IP addresses or upgrade to 16.1.2.2+ / 15.1.5.1+",
+        version_checker=_check_f5_cve_2022_1388_ver,
+        precondition_checker=lambda f: bool(f.get("http_server")),
+        references=["https://support.f5.com/csp/article/K50257404"],
+    ),
+
+    # ------------------- NETSCOUT Arbor -------------------
+    PreconditionRule(
+        cve_id="CVE-2020-24368",
+        title="NETSCOUT Arbor Sightline / TMS Web GUI OS Command Injection",
+        vendor=VENDOR_NETSCOUT,
+        os_family=OS_ARBOR_ARBOS,
+        cvss_base=8.8,
+        in_kev=True,
+        affected_version_description="Sightline < 9.8.0, ArbOS < 7.8.0",
+        description="Vulnerability in the Web GUI component of NETSCOUT Arbor Sightline / Peakflow allows unauthenticated remote attackers to execute arbitrary commands on the underlying OS.",
+        precondition_description="HTTP / Web GUI service enabled (services http status set enabled)",
+        mitigation_cmd="services http status set disabled  # or restrict HTTP access to dedicated management network",
+        version_checker=_check_arbor_cve_2020_24368_ver,
+        precondition_checker=lambda f: bool(f.get("http_server")),
+        references=["https://nvd.nist.gov/vuln/detail/CVE-2020-24368"],
+    ),
+
+    # ------------------- Imperva SecureSphere -------------------
+    PreconditionRule(
+        cve_id="CVE-2023-38646",
+        title="Imperva SecureSphere Management Server Remote Command Execution / Auth Bypass",
+        vendor=VENDOR_IMPERVA,
+        os_family=OS_IMPERVA_SECURESPHERE,
+        cvss_base=8.8,
+        in_kev=True,
+        affected_version_description="SecureSphere < 14.8.0",
+        description="Authentication bypass and remote code execution vulnerability in Imperva SecureSphere MX Management Server web administration console.",
+        precondition_description="HTTP Web GUI interface active (webGuiPort configured)",
+        mitigation_cmd="Restrict Web GUI access via firewall rules or upgrade SecureSphere to 14.8.0+",
+        version_checker=_check_imperva_cve_2023_38646_ver,
+        precondition_checker=lambda f: bool(f.get("http_server")),
+        references=["https://www.imperva.com/trust-center/security-advisories/"],
+    ),
+    PreconditionRule(
+        cve_id="CVE-2022-38753",
+        title="Imperva SecureSphere Management Console Command Injection",
+        vendor=VENDOR_IMPERVA,
+        os_family=OS_IMPERVA_SECURESPHERE,
+        cvss_base=8.8,
+        in_kev=True,
+        affected_version_description="SecureSphere < 14.8.0",
+        description="Command injection vulnerability in SecureSphere WAF management interface allows remote attackers to execute arbitrary system commands.",
+        precondition_description="HTTP Web GUI interface active (webGuiPort configured)",
+        mitigation_cmd="Restrict management access to isolated management network and upgrade to 14.8.0+",
+        version_checker=_check_imperva_cve_2022_38753_ver,
+        precondition_checker=lambda f: bool(f.get("http_server")),
+        references=["https://www.imperva.com/trust-center/security-advisories/"],
     ),
 ]

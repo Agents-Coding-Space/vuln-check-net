@@ -1,0 +1,70 @@
+{
+  "generator": "Vuln-Check-Net Engine",
+  "timestamp": "2026-10-15T10:51:46.853099",
+  "devices_count": 1,
+  "results": [
+    {
+      "device_info": {
+        "hostname": "arbor-tms-edge-01.example.vn",
+        "domain_name": "example.vn",
+        "vendor": "NETSCOUT",
+        "os_family": "arbor_arbos",
+        "version": "9.7.1",
+        "model": "Arbor Sightline / TMS",
+        "features": {
+          "http_server": true,
+          "webvpn": false,
+          "ssl_vpn": false,
+          "snmp_server": true,
+          "telnet": false,
+          "ssh": true,
+          "bgp": true,
+          "ospf": false,
+          "aaa": true,
+          "smart_install": false,
+          "http_outside": false
+        }
+      },
+      "summary": {
+        "total_rules_evaluated": 1,
+        "total_affected_versions": 1,
+        "exploitable_count": 1,
+        "mitigated_count": 0,
+        "critical_count": 1,
+        "high_count": 0,
+        "medium_count": 0,
+        "low_count": 0,
+        "in_kev_count": 1
+      },
+      "vulnerabilities": [
+        {
+          "cve_id": "CVE-2020-24368",
+          "title": "NETSCOUT Arbor Sightline / TMS Web GUI OS Command Injection",
+          "vendor": "NETSCOUT",
+          "os_family": "arbor_arbos",
+          "status": "EXPLOITABLE",
+          "real_risk": "CRITICAL",
+          "base_score": 8.8,
+          "cvss_vector": "",
+          "in_kev": true,
+          "kev_details": {
+            "vulnerability_name": "NETSCOUT Arbor Sightline OS Command Injection Vulnerability",
+            "date_added": "2022-03-25",
+            "required_action": "Apply updates per vendor instructions.",
+            "due_date": "2022-04-15",
+            "ransomware_campaign": "Known",
+            "notes": "https://nvd.nist.gov/vuln/detail/CVE-2020-24368"
+          },
+          "precondition_description": "HTTP / Web GUI service enabled (services http status set enabled)",
+          "precondition_met": true,
+          "mitigation_cmd": "services http status set disabled  # or restrict HTTP access to dedicated management network",
+          "description": "Vulnerability in the Web GUI component of NETSCOUT Arbor Sightline / Peakflow allows unauthenticated remote attackers to execute arbitrary commands on the underlying OS.",
+          "affected_versions": "Sightline < 9.8.0, ArbOS < 7.8.0",
+          "references": [
+            "https://nvd.nist.gov/vuln/detail/CVE-2020-24368"
+          ]
+        }
+      ]
+    }
+  ]
+}

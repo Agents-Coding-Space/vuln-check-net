@@ -16,16 +16,22 @@ from rich.panel import Panel
 from rich.table import Table
 
 from src.config import (
+    OS_ARBOR_ARBOS,
     OS_CISCO_ASA,
     OS_CISCO_IOS_XE,
+    OS_F5_BIGIP,
     OS_FORTINET_FORTIOS,
+    OS_IMPERVA_SECURESPHERE,
     OS_PALOALTO_PANOS,
     RISK_CRITICAL,
     RISK_HIGH,
     STATUS_EXPLOITABLE,
     STATUS_MITIGATED,
     VENDOR_CISCO,
+    VENDOR_F5,
     VENDOR_FORTINET,
+    VENDOR_IMPERVA,
+    VENDOR_NETSCOUT,
     VENDOR_PALOALTO,
 )
 from src.engine import CorrelationEngine
@@ -222,6 +228,15 @@ def handle_lookup(args: argparse.Namespace) -> None:
         elif "palo" in vl or "pan" in vl:
             os_family = OS_PALOALTO_PANOS
             vendor = VENDOR_PALOALTO
+        elif "f5" in vl or "bigip" in vl:
+            os_family = OS_F5_BIGIP
+            vendor = VENDOR_F5
+        elif "arbor" in vl or "arbos" in vl or "sightline" in vl or "netscout" in vl:
+            os_family = OS_ARBOR_ARBOS
+            vendor = VENDOR_NETSCOUT
+        elif "imperva" in vl or "securesphere" in vl:
+            os_family = OS_IMPERVA_SECURESPHERE
+            vendor = VENDOR_IMPERVA
         else:
             os_family = OS_CISCO_ASA
 
