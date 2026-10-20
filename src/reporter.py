@@ -22,6 +22,7 @@ from src.config import (
     RISK_MEDIUM,
     STATUS_EXPLOITABLE,
     STATUS_MITIGATED,
+    STATUS_POTENTIAL,
 )
 
 
@@ -35,9 +36,9 @@ class Reporter:
         self, scan_results: Union[Dict[str, Any], List[Dict[str, Any]]]
     ) -> List[Dict[str, Any]]:
         """Normalize input scan_results into a list of device audit reports."""
-        if isinstance(scan_results, dict):
-            return [scan_results]
-        return scan_results
+        if isinstance(scan_results, list):
+            return scan_results
+        return [scan_results]
 
     # =========================================================================
     # 1. MARKDOWN EXPORT
@@ -97,6 +98,7 @@ class Reporter:
             lines.append(f"| **Rules Evaluated** | {summary.get('total_rules_evaluated', 0)} | Total vendor CVE rules tested |")
             lines.append(f"| **Version In Range** | {summary.get('total_affected_versions', 0)} | CVEs matching OS version (Necessary Condition) |")
             lines.append(f"| :fire: **EXPLOITABLE (Action Required)** | **{summary.get('exploitable_count', 0)}** | Precondition active in config (Sufficient Condition) |")
+            lines.append(f"| :warning: **POTENTIAL (Version Affected)** | **{summary.get('potential_count', 0)}** | Core OS flaw or unverified precondition (Affected by Version) |")
             lines.append(f"| :shield: **MITIGATED (False Positives Avoided)** | **{summary.get('mitigated_count', 0)}** | Feature disabled in config (Real Risk neutralized) |")
             lines.append(f"| :warning: **In CISA KEV** | **{summary.get('in_kev_count', 0)}** | Known Exploited in the Wild / Ransomware campaigns |")
             lines.append(f"| **Critical Real Risk** | {summary.get('critical_count', 0)} | Immediate remediation priority |")
@@ -133,8 +135,18 @@ class Reporter:
                 lines.append("### 5. Technical Details & Remediation Playbook")
                 for v in vulns:
                     lines.append(f"#### <a id=\"{v['cve_id'].lower()}\"></a>{v['cve_id']} - {v['title']}")
-                    lines.append(f"- **Status**: `{v['status']}` ({'Vulnerable service active and reachable' if v['status'] == STATUS_EXPLOITABLE else 'Feature inactive; vulnerability dormant/mitigated'})")
+                    if v.get("status") == STATUS_EXPLOITABLE:
+                        status_note = "Vulnerable service active and reachable"
+                    elif v.get("status") == STATUS_MITIGATED:
+                        status_note = "Feature inactive; vulnerability dormant/mitigated"
+                    else:
+                        status_note = "Affected by Version; OS core flaw or precondition unverified"
+                    lines.append(f"- **Status**: `{v['status']}` ({status_note})")
                     lines.append(f"- **Real Operational Risk**: **{v['real_risk']}** (CVSS: {v['base_score']})")
+                    if v.get("feature_evidence"):
+                        lines.append(f"- **Feature Evidence**: `{v['feature_evidence']}`")
+                    if v.get("mitigation_reason"):
+                        lines.append(f"- **Triage Reason**: {v['mitigation_reason']}")
                     if v.get("in_kev"):
                         kev_det = v.get("kev_details", {})
                         lines.append(f"- **CISA KEV Alert**: Listed on CISA KEV (Date Added: {kev_det.get('date_added', 'N/A')}). Ransomware use: `{kev_det.get('ransomware_campaign', 'Unknown')}`")
@@ -205,6 +217,9 @@ class Reporter:
 
         fill_mitigated = PatternFill(start_color="C6EFCE", end_color="C6EFCE", fill_type="solid")
         font_mitigated = Font(name="Segoe UI", size=10, bold=True, color="006100")
+
+        fill_potential = PatternFill(start_color="FFF2CC", end_color="FFF2CC", fill_type="solid")
+        font_potential = Font(name="Segoe UI", size=10, bold=True, color="B45F06")
 
         # Risk Fills
         fill_critical = PatternFill(start_color="D9534F", end_color="D9534F", fill_type="solid")
@@ -384,6 +399,9 @@ class Reporter:
                         elif c.value == STATUS_MITIGATED:
                             c.fill = fill_mitigated
                             c.font = font_mitigated
+                        else:
+                            c.fill = fill_potential
+                            c.font = font_potential
 
                     # Real Risk styling (Col 7)
                     if col_idx == 7:

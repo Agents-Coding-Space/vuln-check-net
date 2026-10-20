@@ -27,6 +27,7 @@ from src.config import (
     RISK_HIGH,
     STATUS_EXPLOITABLE,
     STATUS_MITIGATED,
+    STATUS_POTENTIAL,
     VENDOR_CISCO,
     VENDOR_F5,
     VENDOR_FORTINET,
@@ -89,14 +90,16 @@ def print_device_audit(result: dict) -> None:
     # Executive Summary Counters
     exp_cnt = summary.get("exploitable_count", 0)
     mit_cnt = summary.get("mitigated_count", 0)
+    pot_cnt = summary.get("potential_count", 0)
     kev_cnt = summary.get("in_kev_count", 0)
     crit_cnt = summary.get("critical_count", 0)
     high_cnt = summary.get("high_count", 0)
 
     summary_text = (
-        f"[bold]Rules Tested:[/bold] {summary.get('total_rules_evaluated', 0)} | "
+        f"[bold]Total Checked:[/bold] {summary.get('total_cves_checked', summary.get('total_rules_evaluated', 0))} | "
         f"[bold]Version Matched:[/bold] {summary.get('total_affected_versions', 0)} | "
         f"[bold red]EXPLOITABLE:[/bold red] {exp_cnt} | "
+        f"[bold yellow]POTENTIAL:[/bold yellow] {pot_cnt} | "
         f"[bold green]MITIGATED:[/bold green] {mit_cnt} | "
         f"[bold magenta]CISA KEV:[/bold magenta] {kev_cnt} | "
         f"[bold red]CRITICAL:[/bold red] {crit_cnt} | "
@@ -123,8 +126,10 @@ def print_device_audit(result: dict) -> None:
         st = v.get("status", "")
         if st == STATUS_EXPLOITABLE:
             st_text = "[bold white on red] EXPLOITABLE [/]"
-        else:
+        elif st == STATUS_MITIGATED:
             st_text = "[bold white on green] MITIGATED [/]"
+        else:
+            st_text = "[bold white on yellow] POTENTIAL [/]"
 
         risk = v.get("real_risk", "")
         if risk == RISK_CRITICAL:
@@ -184,8 +189,7 @@ def handle_scan(args: argparse.Namespace) -> None:
             try:
                 with open(f, "r", encoding="utf-8", errors="ignore") as fp:
                     content = fp.read()
-                parsed = parser.parse(content)
-                result = engine.evaluate_device(parsed)
+                result = engine.scan_config(content, filename=str(f.name))
                 all_results.append(result)
             except Exception as e:
                 console.print(f"[red]Error parsing {f.name}: {e}[/red]")

@@ -721,3 +721,76 @@ PRECONDITION_RULES: List[PreconditionRule] = [
         references=["https://www.imperva.com/trust-center/security-advisories/"],
     ),
 ]
+
+
+# ==============================================================================
+# TRIAGE RULE REGISTRY INTERFACE
+# ==============================================================================
+
+TRIAGE_RULE_REGISTRY: Dict[str, PreconditionRule] = {
+    rule.cve_id.strip().upper(): rule for rule in PRECONDITION_RULES
+}
+
+
+class TriageRuleRegistry:
+    """Registry providing lookup and management of precondition rules."""
+
+    def __init__(self, rules: Optional[List[PreconditionRule]] = None) -> None:
+        self.rules = rules or PRECONDITION_RULES
+        self._map = {r.cve_id.strip().upper(): r for r in self.rules}
+
+    def get_rule(self, cve_id: str) -> Optional[PreconditionRule]:
+        """Look up a rule by CVE ID."""
+        if not cve_id:
+            return None
+        return self._map.get(cve_id.strip().upper())
+
+    def get_rules_for_os(self, os_family: str) -> List[PreconditionRule]:
+        """Retrieve all rules applicable to a specific OS family."""
+        if not os_family:
+            return []
+        os_clean = os_family.strip().lower()
+        return [r for r in self.rules if r.os_family.strip().lower() == os_clean]
+
+    def all_rules(self) -> List[PreconditionRule]:
+        """Return all registered rules."""
+        return list(self.rules)
+
+    def count(self) -> int:
+        """Return total count of registered rules."""
+        return len(self.rules)
+
+
+def get_rule(cve_id: str) -> Optional[PreconditionRule]:
+    """Helper function to look up a rule by CVE ID in default registry."""
+    if not cve_id:
+        return None
+    return TRIAGE_RULE_REGISTRY.get(cve_id.strip().upper())
+
+
+def get_rules_for_os(os_family: str) -> List[PreconditionRule]:
+    """Helper function to look up rules by OS family in default registry."""
+    if not os_family:
+        return []
+    os_clean = os_family.strip().lower()
+    return [r for r in PRECONDITION_RULES if r.os_family.strip().lower() == os_clean]
+
+
+# Re-export Precondition Evaluators and Triage Engine for seamless backward/forward compatibility
+from src.triage import (  # noqa: E402
+    PreconditionResult,
+    TriageLayer,
+    TriageResult,
+    check_aaa,
+    check_bgp,
+    check_http_server,
+    check_ikev2,
+    check_ospf,
+    check_rest_api,
+    check_smart_install,
+    check_snmp,
+    check_ssh,
+    check_telnet,
+    check_webvpn,
+)
+

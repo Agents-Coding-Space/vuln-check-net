@@ -6,7 +6,7 @@ from unittest.mock import patch
 import pytest
 
 from src.fetcher_cisa import CisaKevFetcher, get_kev_details, is_in_kev
-from src.fetcher_nvd import NVDDatabase, NVDFetcher, NvdFetcher
+from src.fetcher_nvd import NVDDatabase, NVDFetcher, NvdFetcher, sync_product_cves
 
 
 @pytest.fixture
@@ -238,3 +238,142 @@ class TestCisaKevFetcher:
             assert fetcher.is_in_kev("CVE-2099-0001").in_kev is True
             # Presets also merged
             assert fetcher.is_in_kev("CVE-2020-24368").in_kev is True
+
+
+class TestNVDSyncProductCVEs:
+    """Validate NVD API 2.0 pagination, CPE range parsing and persistence."""
+
+    def test_sync_product_cves_mocked_pagination(self, temp_db):
+        fetcher = NVDFetcher(db_path=temp_db)
+
+        # Mock responses for page 1 and page 2
+        page1 = {
+            "totalResults": 3,
+            "vulnerabilities": [
+                {
+                    "cve": {
+                        "id": "CVE-2024-88001",
+                        "published": "2024-05-01T10:00:00.000",
+                        "lastModified": "2024-05-02T10:00:00.000",
+                        "descriptions": [{"lang": "en", "value": "Mock ASA Flaw 1"}],
+                        "metrics": {
+                            "cvssMetricV31": [{"cvssData": {"baseScore": 8.8, "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:N"}}]
+                        },
+                        "configurations": [
+                            {
+                                "nodes": [
+                                    {
+                                        "cpeMatch": [
+                                            {
+                                                "criteria": "cpe:2.3:o:cisco:adaptive_security_appliance_software:9.18(3)40:*:*:*:*:*:*:*",
+                                                "versionStartIncluding": "9.18",
+                                                "versionEndExcluding": "9.18(4)",
+                                            }
+                                        ]
+                                    }
+                                ]
+                            }
+                        ],
+                    }
+                },
+                {
+                    "cve": {
+                        "id": "CVE-2024-88002",
+                        "published": "2024-05-02T10:00:00.000",
+                        "lastModified": "2024-05-03T10:00:00.000",
+                        "descriptions": [{"lang": "en", "value": "Mock ASA Flaw 2"}],
+                        "metrics": {
+                            "cvssMetricV31": [{"cvssData": {"baseScore": 7.5, "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N"}}]
+                        },
+                        "configurations": [
+                            {
+                                "nodes": [
+                                    {
+                                        "cpeMatch": [
+                                            {
+                                                "criteria": "cpe:2.3:o:cisco:adaptive_security_appliance_software:*:*:*:*:*:*:*:*",
+                                                "versionEndIncluding": "9.20(3)",
+                                            }
+                                        ]
+                                    }
+                                ]
+                            }
+                        ],
+                    }
+                },
+            ],
+        }
+
+        page2 = {
+            "totalResults": 3,
+            "vulnerabilities": [
+                {
+                    "cve": {
+                        "id": "CVE-2024-88003",
+                        "published": "2024-05-03T10:00:00.000",
+                        "lastModified": "2024-05-04T10:00:00.000",
+                        "descriptions": [{"lang": "en", "value": "Mock ASA Flaw 3"}],
+                        "metrics": {
+                            "cvssMetricV31": [{"cvssData": {"baseScore": 9.8, "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H"}}]
+                        },
+                        "configurations": [
+                            {
+                                "nodes": [
+                                    {
+                                        "cpeMatch": [
+                                            {
+                                                "criteria": "cpe:2.3:o:cisco:adaptive_security_appliance_software:9.14(1)10:*:*:*:*:*:*:*",
+                                            }
+                                        ]
+                                    }
+                                ]
+                            }
+                        ],
+                    }
+                }
+            ],
+        }
+
+        class MockResponse:
+            def __init__(self, json_data, status_code=200):
+                self.json_data = json_data
+                self.status_code = status_code
+
+            def json(self):
+                return self.json_data
+
+        def mock_get(url, params=None, **kwargs):
+            start = params.get("startIndex", 0) if params else 0
+            if start == 0:
+                return MockResponse(page1)
+            elif start == 2:
+                return MockResponse(page2)
+            return MockResponse({"totalResults": 3, "vulnerabilities": []})
+
+        with patch("requests.get", side_effect=mock_get):
+            synced = sync_product_cves(
+                vendor="cisco",
+                product="adaptive_security_appliance_software",
+                cpe_name="cpe:2.3:o:cisco:adaptive_security_appliance_software",
+                max_results=500,
+                fetcher=fetcher,
+            )
+
+        assert synced == 3
+
+        # Verify records in database
+        cve1 = fetcher.get_cve("CVE-2024-88001")
+        assert cve1 is not None
+        assert cve1["cvss_score"] == 8.8
+        assert len(cve1["version_ranges"]) == 1
+        assert cve1["version_ranges"][0]["version_start_inc"] == "9.18"
+        assert cve1["version_ranges"][0]["version_end_exc"] == "9.18(4)"
+
+        cve2 = fetcher.get_cve("CVE-2024-88002")
+        assert cve2 is not None
+        assert cve2["version_ranges"][0]["version_end_inc"] == "9.20(3)"
+
+        cve3 = fetcher.get_cve("CVE-2024-88003")
+        assert cve3 is not None
+        assert cve3["version_ranges"][0]["exact_version"] == "9.14(1)10"
+

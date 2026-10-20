@@ -31,6 +31,67 @@ from src.fetcher_cisa import is_in_kev
 
 logger = logging.getLogger(__name__)
 
+PRODUCT_SYNONYMS: Dict[str, List[str]] = {
+    "adaptive_security_appliance": [
+        "adaptive_security_appliance",
+        "adaptive_security_appliance_software",
+        "asa",
+    ],
+    "adaptive_security_appliance_software": [
+        "adaptive_security_appliance",
+        "adaptive_security_appliance_software",
+        "asa",
+    ],
+    "asa": [
+        "adaptive_security_appliance",
+        "adaptive_security_appliance_software",
+        "asa",
+    ],
+    "ios_xe": ["ios_xe", "ios-xe", "iosxe"],
+    "ios-xe": ["ios_xe", "ios-xe", "iosxe"],
+    "iosxe": ["ios_xe", "ios-xe", "iosxe"],
+    "pan-os": ["pan-os", "pan_os", "panos"],
+    "pan_os": ["pan-os", "pan_os", "panos"],
+    "panos": ["pan-os", "pan_os", "panos"],
+    "fortios": ["fortios", "forti_os"],
+    "forti_os": ["fortios", "forti_os"],
+    "big-ip": ["big-ip", "big_ip", "bigip"],
+    "big_ip": ["big-ip", "big_ip", "bigip"],
+    "bigip": ["big-ip", "big_ip", "bigip"],
+    "arbor_sightline": ["arbor_sightline", "sightline", "arbos"],
+    "sightline": ["arbor_sightline", "sightline", "arbos"],
+    "arbos": ["arbor_sightline", "sightline", "arbos"],
+    "securesphere": ["securesphere", "imperva_securesphere"],
+    "imperva_securesphere": ["securesphere", "imperva_securesphere"],
+    "ios": ["ios", "cisco_ios"],
+}
+
+VENDOR_SYNONYMS: Dict[str, List[str]] = {
+    "cisco": ["cisco"],
+    "fortinet": ["fortinet"],
+    "palo_alto_networks": [
+        "palo_alto_networks",
+        "paloaltonetworks",
+        "palo_alto",
+        "palo alto",
+    ],
+    "paloaltonetworks": [
+        "palo_alto_networks",
+        "paloaltonetworks",
+        "palo_alto",
+        "palo alto",
+    ],
+    "palo_alto": [
+        "palo_alto_networks",
+        "paloaltonetworks",
+        "palo_alto",
+        "palo alto",
+    ],
+    "f5": ["f5", "f5_networks", "f5 networks"],
+    "netscout": ["netscout", "arbor"],
+    "imperva": ["imperva"],
+}
+
 
 # Pre-seeded vulnerability records with version ranges and CISA KEV tags
 OFFLINE_SEED_DATA: List[Dict[str, Any]] = [
@@ -805,29 +866,35 @@ class NVDDatabase:
         v_clean = vendor.strip().lower()
         p_clean = product.strip().lower()
 
+        v_list = VENDOR_SYNONYMS.get(v_clean, [v_clean])
+        p_list = PRODUCT_SYNONYMS.get(p_clean, [p_clean])
+
         matched_cve_ids = set()
 
         with self._get_connection() as conn:
             cursor = conn.cursor()
 
+            v_ph = ",".join("?" for _ in v_list)
+            p_ph = ",".join("?" for _ in p_list)
+
             # 1. Match from cve_records
             cursor.execute(
-                """
+                f"""
                 SELECT cve_id FROM cve_records
-                WHERE LOWER(vendor) = ? AND LOWER(product) = ?
+                WHERE LOWER(vendor) IN ({v_ph}) AND LOWER(product) IN ({p_ph})
                 """,
-                (v_clean, p_clean),
+                (*v_list, *p_list),
             )
             for row in cursor.fetchall():
                 matched_cve_ids.add(row["cve_id"])
 
             # 2. Match from cve_version_ranges
             cursor.execute(
-                """
+                f"""
                 SELECT DISTINCT cve_id FROM cve_version_ranges
-                WHERE LOWER(vendor) = ? AND LOWER(product) = ?
+                WHERE LOWER(vendor) IN ({v_ph}) AND LOWER(product) IN ({p_ph})
                 """,
-                (v_clean, p_clean),
+                (*v_list, *p_list),
             )
             for row in cursor.fetchall():
                 matched_cve_ids.add(row["cve_id"])
@@ -1066,7 +1133,12 @@ class NVDFetcher(NVDDatabase):
 
         return None
 
-    def _parse_nvd_item(self, cve_item: Dict[str, Any]) -> Dict[str, Any]:
+    def _parse_nvd_item(
+        self,
+        cve_item: Dict[str, Any],
+        default_vendor: str = "",
+        default_product: str = "",
+    ) -> Dict[str, Any]:
         """Parse raw NVD JSON item into structured dictionary with CPE version ranges."""
         cve_id = cve_item.get("id", "")
         published = cve_item.get("published", "")
@@ -1082,13 +1154,17 @@ class NVDFetcher(NVDDatabase):
         if not desc_text and descriptions:
             desc_text = descriptions[0].get("value", "")
 
-        # CVSS Metrics (prefer v3.1, then v3.0, then v2.0)
+        # CVSS Metrics (prefer v3.1, then v4.0, then v3.0, then v2.0)
         cvss_score = 0.0
         cvss_vector = ""
         metrics = cve_item.get("metrics", {})
 
         if "cvssMetricV31" in metrics and metrics["cvssMetricV31"]:
             data = metrics["cvssMetricV31"][0].get("cvssData", {})
+            cvss_score = float(data.get("baseScore", 0.0))
+            cvss_vector = data.get("vectorString", "")
+        elif "cvssMetricV40" in metrics and metrics["cvssMetricV40"]:
+            data = metrics["cvssMetricV40"][0].get("cvssData", {})
             cvss_score = float(data.get("baseScore", 0.0))
             cvss_vector = data.get("vectorString", "")
         elif "cvssMetricV30" in metrics and metrics["cvssMetricV30"]:
@@ -1113,41 +1189,61 @@ class NVDFetcher(NVDDatabase):
                 break
 
         # Configurations / CPE version ranges
-        vendor = ""
-        product = ""
+        vendor = default_vendor
+        product = default_product
         version_ranges: List[Dict[str, Any]] = []
 
-        configs = cve_item.get("configurations", [])
-        for cfg in configs:
-            for node in cfg.get("nodes", []):
+        def _collect_matches(node_list: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+            m_res = []
+            for node in node_list:
                 for match in node.get("cpeMatch", []):
-                    criteria = match.get("criteria", "")
-                    # Example CPE 2.3: cpe:2.3:o:cisco:adaptive_security_appliance_software:...
-                    parts = criteria.split(":")
-                    if len(parts) >= 5:
-                        if not vendor:
-                            vendor = parts[3]
-                        if not product:
-                            product = parts[4]
+                    m_res.append(match)
+                if "children" in node:
+                    m_res.extend(_collect_matches(node["children"]))
+            return m_res
 
-                    v_start_inc = match.get("versionStartIncluding")
-                    v_start_exc = match.get("versionStartExcluding")
-                    v_end_inc = match.get("versionEndIncluding")
-                    v_end_exc = match.get("versionEndExcluding")
+        all_matches = []
+        for cfg in cve_item.get("configurations", []):
+            all_matches.extend(_collect_matches(cfg.get("nodes", [])))
 
-                    if any([v_start_inc, v_start_exc, v_end_inc, v_end_exc]):
-                        version_ranges.append(
-                            {
-                                "cve_id": cve_id,
-                                "vendor": parts[3] if len(parts) >= 4 else vendor,
-                                "product": parts[4] if len(parts) >= 5 else product,
-                                "version_start_inc": v_start_inc,
-                                "version_start_exc": v_start_exc,
-                                "version_end_inc": v_end_inc,
-                                "version_end_exc": v_end_exc,
-                                "exact_version": None,
-                            }
-                        )
+        for match in all_matches:
+            criteria = match.get("criteria", "")
+            # Example CPE 2.3: cpe:2.3:o:cisco:adaptive_security_appliance_software:...
+            parts = criteria.split(":")
+            m_vendor = parts[3] if len(parts) >= 4 else vendor
+            m_product = parts[4] if len(parts) >= 5 else product
+            if not vendor and m_vendor:
+                vendor = m_vendor
+            if not product and m_product:
+                product = m_product
+
+            exact_version = None
+            if len(parts) >= 6 and parts[5] not in ("*", "-", ""):
+                exact_version = (
+                    parts[5]
+                    .replace(r"\(", "(")
+                    .replace(r"\)", ")")
+                    .replace(r"\_", "_")
+                )
+
+            v_start_inc = match.get("versionStartIncluding")
+            v_start_exc = match.get("versionStartExcluding")
+            v_end_inc = match.get("versionEndIncluding")
+            v_end_exc = match.get("versionEndExcluding")
+
+            if any([v_start_inc, v_start_exc, v_end_inc, v_end_exc, exact_version]):
+                version_ranges.append(
+                    {
+                        "cve_id": cve_id,
+                        "vendor": m_vendor or vendor,
+                        "product": m_product or product,
+                        "version_start_inc": v_start_inc,
+                        "version_start_exc": v_start_exc,
+                        "version_end_inc": v_end_inc,
+                        "version_end_exc": v_end_exc,
+                        "exact_version": exact_version,
+                    }
+                )
 
         in_kev_flag = 1 if bool(is_in_kev(cve_id)) else 0
 
@@ -1164,6 +1260,179 @@ class NVDFetcher(NVDDatabase):
             "in_cisa_kev": in_kev_flag,
             "version_ranges": version_ranges,
         }
+
+    def sync_product_cves(
+        self,
+        vendor: str,
+        product: str,
+        cpe_name: str,
+        max_results: int = 500,
+        results_per_page: Optional[int] = None,
+    ) -> int:
+        """Synchronize product CVE records from NVD API 2.0 into SQLite DB.
+
+        Supports pagination through startIndex and resultsPerPage (up to 2000 per page).
+        Extracts CVEs, CVSS scores/vectors, and CPE version ranges (versionStartIncluding,
+        versionEndExcluding, exact_version, etc.), storing them in SQLite via upsert_cve().
+
+        Args:
+            vendor: Target vendor (e.g., 'cisco', 'fortinet', 'palo_alto_networks').
+            product: Target product (e.g., 'adaptive_security_appliance_software', 'ios_xe').
+            cpe_name: Virtual match string or CPE 2.3 URI (e.g., 'cpe:2.3:o:cisco:adaptive_security_appliance_software').
+            max_results: Maximum total records to synchronize (default 500).
+            results_per_page: Number of items per request page (default up to 2000).
+
+        Returns:
+            Total count of CVE records synchronized and persisted into the database.
+        """
+        if not cpe_name:
+            logger.warning("sync_product_cves called with empty cpe_name.")
+            return 0
+
+        if results_per_page and results_per_page > 0:
+            page_size = min(results_per_page, 2000)
+        else:
+            page_size = min(max_results, 2000) if max_results > 0 else 500
+
+        start_index = 0
+        total_synced = 0
+        total_results_avail = None
+
+        headers = {"User-Agent": "Vuln-Check-Net/1.0"}
+        if self.api_key:
+            headers["apiKey"] = self.api_key
+
+        while total_synced < max_results:
+            current_limit = min(page_size, max_results - total_synced)
+            params = {
+                "virtualMatchString": cpe_name,
+                "startIndex": start_index,
+                "resultsPerPage": current_limit,
+            }
+
+            # Rate limiting
+            delay = NVD_DELAY_WITH_KEY if self.api_key else NVD_DELAY_NO_KEY
+            elapsed = time.time() - self.last_request_time
+            if elapsed < delay:
+                time.sleep(delay - elapsed)
+
+            attempt = 0
+            current_backoff = BACKOFF_FACTOR
+            success = False
+            data = None
+
+            while attempt < MAX_RETRIES:
+                attempt += 1
+                try:
+                    self.last_request_time = time.time()
+                    resp = requests.get(
+                        NVD_API_URL,
+                        params=params,
+                        headers=headers,
+                        timeout=HTTP_TIMEOUT,
+                    )
+
+                    if resp.status_code == 200:
+                        data = resp.json()
+                        success = True
+                        break
+                    elif resp.status_code == 429:
+                        logger.warning(
+                            "NVD 429 rate limit hit syncing %s (startIndex=%d). Backing off %.1fs...",
+                            cpe_name,
+                            start_index,
+                            current_backoff,
+                        )
+                        time.sleep(current_backoff)
+                        current_backoff *= 2
+                        continue
+                    else:
+                        logger.warning(
+                            "NVD API error status %d for %s (startIndex=%d)",
+                            resp.status_code,
+                            cpe_name,
+                            start_index,
+                        )
+                        break
+                except requests.RequestException as e:
+                    logger.warning(
+                        "Network error connecting to NVD API for %s (startIndex=%d): %s (attempt %d/%d)",
+                        cpe_name,
+                        start_index,
+                        e,
+                        attempt,
+                        MAX_RETRIES,
+                    )
+                    time.sleep(current_backoff)
+                    current_backoff *= 2
+
+            if not success or not data:
+                logger.warning(
+                    "Failed to fetch page for %s at startIndex=%d, stopping sync.",
+                    cpe_name,
+                    start_index,
+                )
+                break
+
+            total_results_avail = data.get("totalResults", 0)
+            vulnerabilities = data.get("vulnerabilities", [])
+            if not vulnerabilities:
+                break
+
+            for item in vulnerabilities:
+                cve_item = item.get("cve", {})
+                record = self._parse_nvd_item(
+                    cve_item,
+                    default_vendor=vendor,
+                    default_product=product,
+                )
+                if not record.get("vendor"):
+                    record["vendor"] = vendor
+                if not record.get("product"):
+                    record["product"] = product
+
+                ranges = record.get("version_ranges", [])
+                for r in ranges:
+                    if not r.get("vendor"):
+                        r["vendor"] = vendor
+                    if not r.get("product"):
+                        r["product"] = product
+
+                self.upsert_cve(record, ranges=ranges)
+                total_synced += 1
+                if total_synced >= max_results:
+                    break
+
+            start_index += len(vulnerabilities)
+            if total_results_avail is not None and start_index >= total_results_avail:
+                break
+
+        logger.info(
+            "Successfully synced %d CVEs for %s/%s (%s)",
+            total_synced,
+            vendor,
+            product,
+            cpe_name,
+        )
+        return total_synced
+
+
+def sync_product_cves(
+    vendor: str,
+    product: str,
+    cpe_name: str,
+    max_results: int = 500,
+    db_path: Path = DB_PATH,
+    fetcher: Optional[NVDFetcher] = None,
+) -> int:
+    """Convenience module-level function to synchronize product CVEs from NVD API 2.0."""
+    instance = fetcher or NVDFetcher(db_path=db_path)
+    return instance.sync_product_cves(
+        vendor=vendor,
+        product=product,
+        cpe_name=cpe_name,
+        max_results=max_results,
+    )
 
 
 # Alias for backward compatibility
