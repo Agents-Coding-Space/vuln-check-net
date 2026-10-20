@@ -39,7 +39,11 @@ def normalize_version(
 
     # 1. SemVer with prerelease (-alpha, -beta, -rc, -dev, -preview, etc. excluding -h)
     m_sem = re.match(r"^(\d+)\.(\d+)\.(\d+)-([a-zA-Z][0-9a-zA-Z.-]*)$", s)
-    if ("semver" in os_lower or not os_lower) and m_sem and not m_sem.group(4).startswith(("h", "H")):
+    if (
+        ("semver" in os_lower or not os_lower)
+        and m_sem
+        and not m_sem.group(4).startswith(("h", "H"))
+    ):
         maj, minr, patch, pre = m_sem.groups()
         pre_parts = []
         for p in re.split(r"[-._]", pre):

@@ -428,4 +428,3 @@ def test_parse_imperva_securesphere_json(parser):
     assert features["http_server"] is True
     assert features["ssh"] is True
     assert features["snmp_server"] is True
-

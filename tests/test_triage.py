@@ -1,6 +1,5 @@
 """Unit tests for Triage Layer, Precondition Evaluators, and scan_config."""
 
-import pytest
 from src.config import (
     OS_CISCO_ASA,
     OS_CISCO_IOS_XE,
@@ -9,11 +8,10 @@ from src.config import (
     STATUS_POTENTIAL,
     VENDOR_CISCO,
 )
-from src.engine import CorrelationEngine, ScanResult, scan_config
+from src.engine import ScanResult, scan_config
 from src.rules import PRECONDITION_RULES, TriageRuleRegistry, get_rule, get_rules_for_os
 from src.triage import (
     TriageLayer,
-    TriageResult,
     check_aaa,
     check_bgp,
     check_http_server,
@@ -31,6 +29,7 @@ from src.triage import (
 # ==============================================================================
 # 1. PRECONDITION EVALUATOR TESTS
 # ==============================================================================
+
 
 def test_check_webvpn():
     # Enabled via features dict
@@ -135,6 +134,7 @@ def test_check_routing_and_crypto():
 # ==============================================================================
 # 2. TRIAGE LAYER EVALUATE TESTS
 # ==============================================================================
+
 
 def test_triage_layer_curated_rule():
     registry = {r.cve_id.upper(): r for r in PRECONDITION_RULES}

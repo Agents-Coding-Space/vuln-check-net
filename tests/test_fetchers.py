@@ -45,7 +45,9 @@ class TestNVDDatabaseSchema:
             "in_cisa_kev": "INTEGER",
         }
         for col_name, col_type in expected_records.items():
-            assert col_name in records_cols, f"Column {col_name} missing from cve_records"
+            assert col_name in records_cols, (
+                f"Column {col_name} missing from cve_records"
+            )
 
         # Check cve_version_ranges columns
         cursor.execute("PRAGMA table_info(cve_version_ranges)")
@@ -62,7 +64,9 @@ class TestNVDDatabaseSchema:
             "exact_version": "TEXT",
         }
         for col_name, col_type in expected_ranges.items():
-            assert col_name in ranges_cols, f"Column {col_name} missing from cve_version_ranges"
+            assert col_name in ranges_cols, (
+                f"Column {col_name} missing from cve_version_ranges"
+            )
 
         conn.close()
 
@@ -155,7 +159,9 @@ class TestNVDDatabaseMethods:
         assert "CVE-2020-3187" in cve_ids
 
         # Case insensitivity test
-        results_caps = nvd_db.get_cves_by_product("CISCO", "ADAPTIVE_SECURITY_APPLIANCE")
+        results_caps = nvd_db.get_cves_by_product(
+            "CISCO", "ADAPTIVE_SECURITY_APPLIANCE"
+        )
         assert len(results_caps) == len(results)
 
     def test_get_cve_count(self, nvd_db):
@@ -257,7 +263,14 @@ class TestNVDSyncProductCVEs:
                         "lastModified": "2024-05-02T10:00:00.000",
                         "descriptions": [{"lang": "en", "value": "Mock ASA Flaw 1"}],
                         "metrics": {
-                            "cvssMetricV31": [{"cvssData": {"baseScore": 8.8, "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:N"}}]
+                            "cvssMetricV31": [
+                                {
+                                    "cvssData": {
+                                        "baseScore": 8.8,
+                                        "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:N",
+                                    }
+                                }
+                            ]
                         },
                         "configurations": [
                             {
@@ -283,7 +296,14 @@ class TestNVDSyncProductCVEs:
                         "lastModified": "2024-05-03T10:00:00.000",
                         "descriptions": [{"lang": "en", "value": "Mock ASA Flaw 2"}],
                         "metrics": {
-                            "cvssMetricV31": [{"cvssData": {"baseScore": 7.5, "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N"}}]
+                            "cvssMetricV31": [
+                                {
+                                    "cvssData": {
+                                        "baseScore": 7.5,
+                                        "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N",
+                                    }
+                                }
+                            ]
                         },
                         "configurations": [
                             {
@@ -314,7 +334,14 @@ class TestNVDSyncProductCVEs:
                         "lastModified": "2024-05-04T10:00:00.000",
                         "descriptions": [{"lang": "en", "value": "Mock ASA Flaw 3"}],
                         "metrics": {
-                            "cvssMetricV31": [{"cvssData": {"baseScore": 9.8, "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H"}}]
+                            "cvssMetricV31": [
+                                {
+                                    "cvssData": {
+                                        "baseScore": 9.8,
+                                        "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H",
+                                    }
+                                }
+                            ]
                         },
                         "configurations": [
                             {
@@ -376,4 +403,3 @@ class TestNVDSyncProductCVEs:
         cve3 = fetcher.get_cve("CVE-2024-88003")
         assert cve3 is not None
         assert cve3["version_ranges"][0]["exact_version"] == "9.14(1)10"
-

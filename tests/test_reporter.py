@@ -1,6 +1,5 @@
 """Unit tests for Reporter module including Rich summary table, Breakdown, and Triage filters."""
 
-from pathlib import Path
 import pytest
 from rich.console import Console
 
@@ -8,7 +7,6 @@ from src.config import (
     RISK_CRITICAL,
     RISK_HIGH,
     RISK_LOW,
-    RISK_MEDIUM,
     STATUS_EXPLOITABLE,
     STATUS_MITIGATED,
     STATUS_POTENTIAL,
@@ -184,7 +182,9 @@ def test_reporter_filter_vulnerabilities(sample_scan_result):
     assert {v["cve_id"] for v in f_kev} == {"CVE-2023-20198", "CVE-2023-44487"}
 
     # 6. Combined filter: exploitable + kev_only
-    f_comb = reporter.filter_vulnerabilities(vulns, filter_triage="exploitable", kev_only=True)
+    f_comb = reporter.filter_vulnerabilities(
+        vulns, filter_triage="exploitable", kev_only=True
+    )
     assert len(f_comb) == 1
     assert f_comb[0]["cve_id"] == "CVE-2023-20198"
 
@@ -211,7 +211,9 @@ def test_reporter_build_summary_table(sample_scan_result):
     assert "CISA KEV" in col_names
 
     # Check filtering parameter inside table
-    t_exp = reporter.build_summary_table(sample_scan_result, filter_triage="exploitable")
+    t_exp = reporter.build_summary_table(
+        sample_scan_result, filter_triage="exploitable"
+    )
     assert "EXPLOITABLE" in t_exp.title
 
 
@@ -222,7 +224,10 @@ def test_reporter_print_device_audit_console_capture(sample_scan_result):
     reporter.print_device_audit(sample_scan_result, console=console)
     output = console.export_text()
 
-    assert "Authoritative Data Source: NIST NVD API 2.0 (Local SQLite Cache) + CISA KEV Feed" in output
+    assert (
+        "Authoritative Data Source: NIST NVD API 2.0 (Local SQLite Cache) + CISA KEV Feed"
+        in output
+    )
     assert "EDGE-TEST-ROUTER" in output
     assert "NVD & Triage Intelligence Breakdown" in output
     assert "[EXPLOITABLE]" in output

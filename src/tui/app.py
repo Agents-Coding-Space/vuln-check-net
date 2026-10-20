@@ -55,13 +55,41 @@ from src.reporter import Reporter
 
 # 7 Real-world sample configurations
 QUICK_SAMPLES: List[Tuple[str, str, str]] = [
-    ("ASA 1", "F:/WORK/NCS_Downloads/Network config/Firewall ASA1.txt", "btn-sample-asa"),
-    ("IOS XE", "F:/WORK/NCS_Downloads/cisco_ios_xe_sample_config.txt", "btn-sample-iosxe"),
-    ("FortiOS", "F:/WORK/NCS_Downloads/fortigate_fortios_sample_config.txt", "btn-sample-fortios"),
-    ("PAN-OS", "F:/WORK/NCS_Downloads/paloalto_panos_sample_config.txt", "btn-sample-panos"),
-    ("F5 BIG-IP", "F:/WORK/NCS_Downloads/f5_bigip_asm_waf_sample_config.txt", "btn-sample-f5"),
-    ("Arbor", "F:/WORK/NCS_Downloads/arbor_sightline_tms_sample_config.txt", "btn-sample-arbor"),
-    ("Imperva", "F:/WORK/NCS_Downloads/imperva_waf_sample_config.txt", "btn-sample-imperva"),
+    (
+        "ASA 1",
+        "F:/WORK/NCS_Downloads/Network config/Firewall ASA1.txt",
+        "btn-sample-asa",
+    ),
+    (
+        "IOS XE",
+        "F:/WORK/NCS_Downloads/cisco_ios_xe_sample_config.txt",
+        "btn-sample-iosxe",
+    ),
+    (
+        "FortiOS",
+        "F:/WORK/NCS_Downloads/fortigate_fortios_sample_config.txt",
+        "btn-sample-fortios",
+    ),
+    (
+        "PAN-OS",
+        "F:/WORK/NCS_Downloads/paloalto_panos_sample_config.txt",
+        "btn-sample-panos",
+    ),
+    (
+        "F5 BIG-IP",
+        "F:/WORK/NCS_Downloads/f5_bigip_asm_waf_sample_config.txt",
+        "btn-sample-f5",
+    ),
+    (
+        "Arbor",
+        "F:/WORK/NCS_Downloads/arbor_sightline_tms_sample_config.txt",
+        "btn-sample-arbor",
+    ),
+    (
+        "Imperva",
+        "F:/WORK/NCS_Downloads/imperva_waf_sample_config.txt",
+        "btn-sample-imperva",
+    ),
 ]
 
 # Supported Vendor & OS options for Version Lookup
@@ -372,7 +400,9 @@ class DetailScrollContainer(VerticalScroll):
         Binding("escape", "return_to_table", "Back to Table", show=False),
     ]
 
-    def __init__(self, *children: Any, target_table_id: str = "audit-datatable", **kwargs: Any) -> None:
+    def __init__(
+        self, *children: Any, target_table_id: str = "audit-datatable", **kwargs: Any
+    ) -> None:
         super().__init__(*children, **kwargs)
         self.target_table_id = target_table_id
 
@@ -433,7 +463,9 @@ class VulnerabilityDetailModal(ModalScreen[None]):
     }
     """
 
-    def __init__(self, markdown_text: str, title: str = "Vulnerability Full Details") -> None:
+    def __init__(
+        self, markdown_text: str, title: str = "Vulnerability Full Details"
+    ) -> None:
         super().__init__()
         self.markdown_text = markdown_text
         self.dialog_title = title
@@ -555,20 +587,46 @@ class VulnCheckApp(App):
                 # Triage Filter Bar
                 with Horizontal(id="audit-filter-bar", classes="filter-bar"):
                     yield Label("Triage Filter:")
-                    yield Button("All [F1]", id="btn-triage-all", classes="btn-filter btn-filter-active")
-                    yield Button("Exploitable [F2]", id="btn-triage-exploitable", classes="btn-filter")
-                    yield Button("CISA KEV [F3]", id="btn-triage-kev", classes="btn-filter")
-                    yield Button("Mitigated [F4]", id="btn-triage-mitigated", classes="btn-filter")
-                    yield Button("Potential", id="btn-triage-potential", classes="btn-filter")
+                    yield Button(
+                        "All [F1]",
+                        id="btn-triage-all",
+                        classes="btn-filter btn-filter-active",
+                    )
+                    yield Button(
+                        "Exploitable [F2]",
+                        id="btn-triage-exploitable",
+                        classes="btn-filter",
+                    )
+                    yield Button(
+                        "CISA KEV [F3]", id="btn-triage-kev", classes="btn-filter"
+                    )
+                    yield Button(
+                        "Mitigated [F4]",
+                        id="btn-triage-mitigated",
+                        classes="btn-filter",
+                    )
+                    yield Button(
+                        "Potential", id="btn-triage-potential", classes="btn-filter"
+                    )
 
                 # DataTable for audit findings
                 yield DataTable(id="audit-datatable")
 
                 # Detail Action & Hint Bar
-                with Horizontal(id="vuln-detail-header-bar", classes="detail-header-bar"):
-                    yield Button("[V] Full Details", id="btn-vuln-fullscreen", classes="btn-detail-tool")
-                    yield Button("↑", id="btn-vuln-scroll-up", classes="btn-detail-tool")
-                    yield Button("↓", id="btn-vuln-scroll-down", classes="btn-detail-tool")
+                with Horizontal(
+                    id="vuln-detail-header-bar", classes="detail-header-bar"
+                ):
+                    yield Button(
+                        "[V] Full Details",
+                        id="btn-vuln-fullscreen",
+                        classes="btn-detail-tool",
+                    )
+                    yield Button(
+                        "↑", id="btn-vuln-scroll-up", classes="btn-detail-tool"
+                    )
+                    yield Button(
+                        "↓", id="btn-vuln-scroll-down", classes="btn-detail-tool"
+                    )
                     yield Label(
                         "[dim]Enter/Click to Focus • ↑/↓ or Alt+↑/↓ to Scroll • Esc to return to Table[/dim]",
                         id="lbl-vuln-hints",
@@ -591,10 +649,17 @@ class VulnCheckApp(App):
             with TabPane("Version Lookup", id="tab-lookup"):
                 with Horizontal(id="lookup-controls-bar", classes="lookup-bar"):
                     yield Label("Vendor / OS Family:")
-                    yield Select(VENDOR_OPTIONS, id="select-lookup-vendor", value="cisco_asa")
+                    yield Select(
+                        VENDOR_OPTIONS, id="select-lookup-vendor", value="cisco_asa"
+                    )
                     yield Label("OS Version:")
-                    yield Input(placeholder="e.g. 9.20(3), 17.6, 7.2.4", id="input-lookup-version")
-                    yield Button("Check Version", id="btn-check-version", variant="primary")
+                    yield Input(
+                        placeholder="e.g. 9.20(3), 17.6, 7.2.4",
+                        id="input-lookup-version",
+                    )
+                    yield Button(
+                        "Check Version", id="btn-check-version", variant="primary"
+                    )
 
                 with Horizontal(id="lookup-presets-bar", classes="filter-bar"):
                     yield Label("Quick Presets:")
@@ -607,10 +672,20 @@ class VulnCheckApp(App):
                 )
                 yield DataTable(id="table-lookup-vulns")
 
-                with Horizontal(id="lookup-detail-header-bar", classes="detail-header-bar"):
-                    yield Button("[V] Full Details", id="btn-lookup-fullscreen", classes="btn-detail-tool")
-                    yield Button("↑", id="btn-lookup-scroll-up", classes="btn-detail-tool")
-                    yield Button("↓", id="btn-lookup-scroll-down", classes="btn-detail-tool")
+                with Horizontal(
+                    id="lookup-detail-header-bar", classes="detail-header-bar"
+                ):
+                    yield Button(
+                        "[V] Full Details",
+                        id="btn-lookup-fullscreen",
+                        classes="btn-detail-tool",
+                    )
+                    yield Button(
+                        "↑", id="btn-lookup-scroll-up", classes="btn-detail-tool"
+                    )
+                    yield Button(
+                        "↓", id="btn-lookup-scroll-down", classes="btn-detail-tool"
+                    )
                     yield Label(
                         "[dim]Enter/Click to Focus • ↑/↓ or Alt+↑/↓ to Scroll • Esc to return to Table[/dim]",
                         id="lbl-lookup-hints",
@@ -643,17 +718,33 @@ class VulnCheckApp(App):
                     yield Label("Quick Filters:")
                     yield Button("All", id="btn-filter-all", classes="btn-filter")
                     yield Button("Cisco", id="btn-filter-cisco", classes="btn-filter")
-                    yield Button("Fortinet", id="btn-filter-fortinet", classes="btn-filter")
-                    yield Button("Palo Alto", id="btn-filter-paloalto", classes="btn-filter")
+                    yield Button(
+                        "Fortinet", id="btn-filter-fortinet", classes="btn-filter"
+                    )
+                    yield Button(
+                        "Palo Alto", id="btn-filter-paloalto", classes="btn-filter"
+                    )
                     yield Button("F5", id="btn-filter-f5", classes="btn-filter")
-                    yield Button("Ransomware Only", id="btn-filter-ransomware", classes="btn-filter")
+                    yield Button(
+                        "Ransomware Only",
+                        id="btn-filter-ransomware",
+                        classes="btn-filter",
+                    )
 
                 yield DataTable(id="table-kev")
 
-                with Horizontal(id="kev-detail-header-bar", classes="detail-header-bar"):
-                    yield Button("[V] Full Details", id="btn-kev-fullscreen", classes="btn-detail-tool")
+                with Horizontal(
+                    id="kev-detail-header-bar", classes="detail-header-bar"
+                ):
+                    yield Button(
+                        "[V] Full Details",
+                        id="btn-kev-fullscreen",
+                        classes="btn-detail-tool",
+                    )
                     yield Button("↑", id="btn-kev-scroll-up", classes="btn-detail-tool")
-                    yield Button("↓", id="btn-kev-scroll-down", classes="btn-detail-tool")
+                    yield Button(
+                        "↓", id="btn-kev-scroll-down", classes="btn-detail-tool"
+                    )
                     yield Label(
                         "[dim]Enter/Click to Focus • ↑/↓ or Alt+↑/↓ to Scroll • Esc to return to Table[/dim]",
                         id="lbl-kev-hints",
@@ -835,10 +926,16 @@ class VulnCheckApp(App):
             try:
                 table = self.query_one("#audit-datatable", DataTable)
                 if table.row_count > 0 and table.cursor_row is not None:
-                    row_key = table.coordinate_to_cell_key((table.cursor_row, 0)).row_key.value
+                    row_key = table.coordinate_to_cell_key(
+                        (table.cursor_row, 0)
+                    ).row_key.value
                     if row_key and str(row_key) in self.audit_vulns_map:
                         v = self.audit_vulns_map[str(row_key)]
-                        st = (v.get("status") or v.get("triage_status", "")).strip().upper()
+                        st = (
+                            (v.get("status") or v.get("triage_status", ""))
+                            .strip()
+                            .upper()
+                        )
                         title = f"[{st}] {v.get('cve_id', 'Vulnerability')} — {v.get('title', '')}"
             except Exception:
                 pass
@@ -852,7 +949,9 @@ class VulnCheckApp(App):
             try:
                 table = self.query_one("#table-lookup-vulns", DataTable)
                 if table.row_count > 0 and table.cursor_row is not None:
-                    row_key = table.coordinate_to_cell_key((table.cursor_row, 0)).row_key.value
+                    row_key = table.coordinate_to_cell_key(
+                        (table.cursor_row, 0)
+                    ).row_key.value
                     if row_key and str(row_key) in self.lookup_vulns_map:
                         v = self.lookup_vulns_map[str(row_key)]
                         title = f"{v.get('cve_id', 'Lookup')} — {v.get('title', '')}"
@@ -868,7 +967,9 @@ class VulnCheckApp(App):
             try:
                 table = self.query_one("#table-kev", DataTable)
                 if table.row_count > 0 and table.cursor_row is not None:
-                    row_key = table.coordinate_to_cell_key((table.cursor_row, 0)).row_key.value
+                    row_key = table.coordinate_to_cell_key(
+                        (table.cursor_row, 0)
+                    ).row_key.value
                     if row_key and str(row_key) in self.kev_records_map:
                         rec = self.kev_records_map[str(row_key)]
                         title = f"{rec.get('cveID', 'KEV')} — {rec.get('vulnerabilityName', '')}"
@@ -910,7 +1011,9 @@ class VulnCheckApp(App):
 
         dev_info = self.current_audit_result.get("device_info", {})
         hostname = dev_info.get("hostname", "device")
-        safe_name = "".join(c if c.isalnum() or c in ("-", "_") else "_" for c in hostname)
+        safe_name = "".join(
+            c if c.isalnum() or c in ("-", "_") else "_" for c in hostname
+        )
         OUTPUTS_DIR.mkdir(parents=True, exist_ok=True)
 
         target_md = OUTPUTS_DIR / f"{safe_name}_report.md"
@@ -970,11 +1073,19 @@ class VulnCheckApp(App):
             self.set_triage_filter("potential")
 
         # 2b. Detail Header buttons (fullscreen & scrolling)
-        elif bid in ("btn-vuln-fullscreen", "btn-lookup-fullscreen", "btn-kev-fullscreen"):
+        elif bid in (
+            "btn-vuln-fullscreen",
+            "btn-lookup-fullscreen",
+            "btn-kev-fullscreen",
+        ):
             self.action_view_fullscreen()
         elif bid in ("btn-vuln-scroll-up", "btn-lookup-scroll-up", "btn-kev-scroll-up"):
             self.action_scroll_detail_up()
-        elif bid in ("btn-vuln-scroll-down", "btn-lookup-scroll-down", "btn-kev-scroll-down"):
+        elif bid in (
+            "btn-vuln-scroll-down",
+            "btn-lookup-scroll-down",
+            "btn-kev-scroll-down",
+        ):
             self.action_scroll_detail_down()
 
         # 3. Export buttons
@@ -1040,7 +1151,9 @@ class VulnCheckApp(App):
 
     def on_data_table_row_highlighted(self, event: DataTable.RowHighlighted) -> None:
         """Handle row cursor movement in any DataTable."""
-        self._handle_table_selection(event.data_table.id, event.row_key.value if event.row_key else None)
+        self._handle_table_selection(
+            event.data_table.id, event.row_key.value if event.row_key else None
+        )
 
     def on_data_table_row_selected(self, event: DataTable.RowSelected) -> None:
         """Handle row click or Enter in any DataTable."""
@@ -1059,7 +1172,9 @@ class VulnCheckApp(App):
         except Exception:
             pass
 
-    def _handle_table_selection(self, table_id: Optional[str], key: Optional[str]) -> None:
+    def _handle_table_selection(
+        self, table_id: Optional[str], key: Optional[str]
+    ) -> None:
         """Update detail panel according to active table selection."""
         if not table_id or not key or not self.is_running:
             return
@@ -1074,15 +1189,23 @@ class VulnCheckApp(App):
                         else {}
                     )
                     panel = self.query_one("#detail-content", Markdown)
-                    panel.update(self._render_vuln_detail(self.audit_vulns_map[key_str], dev_info))
+                    panel.update(
+                        self._render_vuln_detail(
+                            self.audit_vulns_map[key_str], dev_info
+                        )
+                    )
                     container = self.query_one("#vuln-detail-container", VerticalScroll)
                     container.scroll_to(y=0, animate=False)
 
             elif table_id == "table-lookup-vulns":
                 if key_str in self.lookup_vulns_map:
                     panel = self.query_one("#lookup-detail-panel", Static)
-                    panel.update(self._render_lookup_detail(self.lookup_vulns_map[key_str]))
-                    container = self.query_one("#lookup-detail-container", VerticalScroll)
+                    panel.update(
+                        self._render_lookup_detail(self.lookup_vulns_map[key_str])
+                    )
+                    container = self.query_one(
+                        "#lookup-detail-container", VerticalScroll
+                    )
                     container.scroll_to(y=0, animate=False)
 
             elif table_id == "table-kev":
@@ -1112,14 +1235,18 @@ class VulnCheckApp(App):
         try:
             content = p.read_text(encoding="utf-8", errors="ignore")
         except Exception as e:
-            self.notify(f"Could not read file: {e}", title="Read Error", severity="error")
+            self.notify(
+                f"Could not read file: {e}", title="Read Error", severity="error"
+            )
             return
 
         try:
             parsed = self.parser.parse(content)
             audit_result = self.engine.evaluate_device(parsed)
         except Exception as e:
-            self.notify(f"Engine evaluation error: {e}", title="Audit Error", severity="error")
+            self.notify(
+                f"Engine evaluation error: {e}", title="Audit Error", severity="error"
+            )
             return
 
         self.current_audit_result = audit_result
@@ -1183,7 +1310,9 @@ class VulnCheckApp(App):
                 if v.get("in_kev")
                 else Text("No", style="dim")
             )
-            precond_txt = v.get("feature_evidence") or v.get("precondition_description", "")
+            precond_txt = v.get("feature_evidence") or v.get(
+                "precondition_description", ""
+            )
 
             table.add_row(
                 cve_id,
@@ -1206,7 +1335,9 @@ class VulnCheckApp(App):
 
         filtered = self.reporter.filter_vulnerabilities(
             all_vulns,
-            filter_triage=self.current_triage_filter if self.current_triage_filter != "kev" else "all",
+            filter_triage=self.current_triage_filter
+            if self.current_triage_filter != "kev"
+            else "all",
             kev_only=(self.current_triage_filter == "kev"),
         )
 
@@ -1217,7 +1348,9 @@ class VulnCheckApp(App):
         if filtered:
             table.move_cursor(row=0)
             detail_panel.update(self._render_vuln_detail(filtered[0], dev_info))
-            self.query_one("#vuln-detail-container", VerticalScroll).scroll_to(y=0, animate=False)
+            self.query_one("#vuln-detail-container", VerticalScroll).scroll_to(
+                y=0, animate=False
+            )
         else:
             if not all_vulns:
                 detail_panel.update(
@@ -1291,7 +1424,9 @@ class VulnCheckApp(App):
             f"[dim]Critical / High[/dim]\n[bold red]{crit}[/bold red] / [bold yellow]{high}[/bold yellow]"
         )
 
-    def _render_vuln_detail(self, vuln: Dict[str, Any], dev_info: Dict[str, Any]) -> str:
+    def _render_vuln_detail(
+        self, vuln: Dict[str, Any], dev_info: Dict[str, Any]
+    ) -> str:
         """Render comprehensive vulnerability detail panel in Markdown format."""
         cve_id = vuln.get("cve_id", "N/A")
         title = vuln.get("title", "")
@@ -1304,8 +1439,13 @@ class VulnCheckApp(App):
         kev_details = vuln.get("kev_details", {})
         precond_desc = vuln.get("precondition_description", "N/A")
         precond_met = vuln.get("precondition_met", False)
-        feature_evidence = vuln.get("feature_evidence") or "No direct configuration evidence pattern matched."
-        mitigation_reason = vuln.get("mitigation_reason") or "No specific mitigation reason recorded."
+        feature_evidence = (
+            vuln.get("feature_evidence")
+            or "No direct configuration evidence pattern matched."
+        )
+        mitigation_reason = (
+            vuln.get("mitigation_reason") or "No specific mitigation reason recorded."
+        )
         mit_cmd = vuln.get("mitigation_cmd", "N/A")
         affected_ver = vuln.get("affected_versions", "N/A")
         vendor = vuln.get("vendor") or dev_info.get("vendor", "N/A")
@@ -1412,7 +1552,9 @@ class VulnCheckApp(App):
 
         dev_info = self.current_audit_result.get("device_info", {})
         hostname = dev_info.get("hostname", "device")
-        safe_name = "".join(c if c.isalnum() or c in ("-", "_") else "_" for c in hostname)
+        safe_name = "".join(
+            c if c.isalnum() or c in ("-", "_") else "_" for c in hostname
+        )
         OUTPUTS_DIR.mkdir(parents=True, exist_ok=True)
 
         if fmt == "md":
@@ -1504,7 +1646,9 @@ class VulnCheckApp(App):
         if results:
             table.move_cursor(row=0)
             detail_panel.update(self._render_lookup_detail(results[0]))
-            self.query_one("#lookup-detail-container", VerticalScroll).scroll_to(y=0, animate=False)
+            self.query_one("#lookup-detail-container", VerticalScroll).scroll_to(
+                y=0, animate=False
+            )
         else:
             detail_panel.update(
                 f"[bold green]✔ No known CVE rules match {os_family} version {version_str}.[/bold green]"
@@ -1623,7 +1767,9 @@ class VulnCheckApp(App):
         if filtered:
             table.move_cursor(row=0)
             detail.update(self._render_kev_detail(filtered[0]))
-            self.query_one("#kev-detail-container", VerticalScroll).scroll_to(y=0, animate=False)
+            self.query_one("#kev-detail-container", VerticalScroll).scroll_to(
+                y=0, animate=False
+            )
         else:
             detail.update("*No KEV records match the current filter query.*")
 

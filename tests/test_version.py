@@ -1,6 +1,5 @@
 """Unit tests for version parsing and comparison utilities."""
 
-import pytest
 from src.version_utils import compare_versions, is_version_in_range, normalize_version
 
 
@@ -59,20 +58,46 @@ def test_compare_fortinet_versions():
 
 def test_is_version_in_range():
     assert is_version_in_range("9.20(3)", min_ver="9.18(1)", max_ver="9.20(4)") is True
-    assert is_version_in_range("9.20(3)", min_ver="9.20(3)", max_ver="9.20(3)", include_max=True) is True
-    assert is_version_in_range("9.20(3)", min_ver="9.20(3)", max_ver="9.20(3)", include_max=False) is False
-    assert is_version_in_range("10.2.3-h4", min_ver="10.2.0", max_ver="10.2.3-h5") is True
+    assert (
+        is_version_in_range(
+            "9.20(3)", min_ver="9.20(3)", max_ver="9.20(3)", include_max=True
+        )
+        is True
+    )
+    assert (
+        is_version_in_range(
+            "9.20(3)", min_ver="9.20(3)", max_ver="9.20(3)", include_max=False
+        )
+        is False
+    )
+    assert (
+        is_version_in_range("10.2.3-h4", min_ver="10.2.0", max_ver="10.2.3-h5") is True
+    )
     assert is_version_in_range("17.15.1a", min_ver="17.15.0", max_ver="17.15.2") is True
-    assert is_version_in_range("7.2.4", min_ver="7.2.0", max_ver="7.2.4", include_max=True) is True
-    assert is_version_in_range("7.2.5", min_ver="7.2.0", max_ver="7.2.4", include_max=True) is False
+    assert (
+        is_version_in_range("7.2.4", min_ver="7.2.0", max_ver="7.2.4", include_max=True)
+        is True
+    )
+    assert (
+        is_version_in_range("7.2.5", min_ver="7.2.0", max_ver="7.2.4", include_max=True)
+        is False
+    )
 
 
 def test_nvd_version_in_range_bounds():
     """Verify is_version_in_range with NVD CPE dải biên (v_start_inc, v_start_exc, v_end_inc, v_end_exc)."""
     # Cisco ASA: 9.18(3)40 in range [9.18, 9.18(4))
-    assert is_version_in_range("9.18(3)40", v_start_inc="9.18", v_end_exc="9.18(4)") is True
-    assert is_version_in_range("9.18(4)", v_start_inc="9.18", v_end_exc="9.18(4)") is False
-    assert is_version_in_range("9.18(3)40", v_start_inc="9.18(3)40", v_end_inc="9.18(3)40") is True
+    assert (
+        is_version_in_range("9.18(3)40", v_start_inc="9.18", v_end_exc="9.18(4)")
+        is True
+    )
+    assert (
+        is_version_in_range("9.18(4)", v_start_inc="9.18", v_end_exc="9.18(4)") is False
+    )
+    assert (
+        is_version_in_range("9.18(3)40", v_start_inc="9.18(3)40", v_end_inc="9.18(3)40")
+        is True
+    )
     assert is_version_in_range("9.18(3)40", v_start_exc="9.18(3)40") is False
 
     # Exact version matching
@@ -80,11 +105,21 @@ def test_nvd_version_in_range_bounds():
     assert is_version_in_range("9.20(3)", exact_version="9.20(4)") is False
 
     # Cisco IOS XE: 17.3.3 and 16.12.1a
-    assert is_version_in_range("17.3.3", v_start_inc="17.3.0", v_end_exc="17.3.4") is True
-    assert is_version_in_range("17.3.3", v_start_inc="17.3.3", v_end_inc="17.3.3") is True
+    assert (
+        is_version_in_range("17.3.3", v_start_inc="17.3.0", v_end_exc="17.3.4") is True
+    )
+    assert (
+        is_version_in_range("17.3.3", v_start_inc="17.3.3", v_end_inc="17.3.3") is True
+    )
     assert is_version_in_range("17.3.3", v_start_exc="17.3.3") is False
-    assert is_version_in_range("16.12.1a", v_start_inc="16.12.1", v_end_inc="16.12.1a") is True
-    assert is_version_in_range("16.12.1b", v_start_inc="16.12.1", v_end_inc="16.12.1a") is False
+    assert (
+        is_version_in_range("16.12.1a", v_start_inc="16.12.1", v_end_inc="16.12.1a")
+        is True
+    )
+    assert (
+        is_version_in_range("16.12.1b", v_start_inc="16.12.1", v_end_inc="16.12.1a")
+        is False
+    )
 
     # Fortinet FortiOS: 7.2.5
     assert is_version_in_range("7.2.5", v_start_inc="7.2.0", v_end_exc="7.2.6") is True
@@ -93,16 +128,38 @@ def test_nvd_version_in_range_bounds():
     assert is_version_in_range("7.2.5", v_end_exc="7.2.5") is False
 
     # Palo Alto PAN-OS: 10.1.6-h3
-    assert is_version_in_range("10.1.6-h3", v_start_inc="10.1.0", v_end_exc="10.1.6-h4") is True
-    assert is_version_in_range("10.1.6-h3", v_start_inc="10.1.6-h3", v_end_inc="10.1.6-h3") is True
+    assert (
+        is_version_in_range("10.1.6-h3", v_start_inc="10.1.0", v_end_exc="10.1.6-h4")
+        is True
+    )
+    assert (
+        is_version_in_range("10.1.6-h3", v_start_inc="10.1.6-h3", v_end_inc="10.1.6-h3")
+        is True
+    )
     assert is_version_in_range("10.1.6-h3", v_start_exc="10.1.6-h3") is False
     assert is_version_in_range("10.1.6-h3", v_end_exc="10.1.6-h3") is False
-    assert is_version_in_range("10.1.6-h4", v_start_inc="10.1.0", v_end_exc="10.1.6-h4") is False
+    assert (
+        is_version_in_range("10.1.6-h4", v_start_inc="10.1.0", v_end_exc="10.1.6-h4")
+        is False
+    )
 
     # SemVer
-    assert is_version_in_range("1.2.3", v_start_inc="1.0.0", v_end_exc="2.0.0", os_type="semver") is True
-    assert is_version_in_range("2.0.0", v_start_inc="1.0.0", v_end_exc="2.0.0", os_type="semver") is False
-    assert is_version_in_range("1.0.0-alpha", v_start_inc="1.0.0-alpha", v_end_exc="1.0.0") is True
+    assert (
+        is_version_in_range(
+            "1.2.3", v_start_inc="1.0.0", v_end_exc="2.0.0", os_type="semver"
+        )
+        is True
+    )
+    assert (
+        is_version_in_range(
+            "2.0.0", v_start_inc="1.0.0", v_end_exc="2.0.0", os_type="semver"
+        )
+        is False
+    )
+    assert (
+        is_version_in_range("1.0.0-alpha", v_start_inc="1.0.0-alpha", v_end_exc="1.0.0")
+        is True
+    )
 
 
 def test_edge_cases():

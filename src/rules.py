@@ -5,12 +5,11 @@ sufficient conditions (active feature preconditions) for high-impact CVEs.
 """
 
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List
+from typing import Any, Callable, Dict, List, Optional
 
 from src.config import (
     OS_ARBOR_ARBOS,
     OS_CISCO_ASA,
-    OS_CISCO_IOS_CLASSIC,
     OS_CISCO_IOS_XE,
     OS_F5_BIGIP,
     OS_FORTINET_FORTIOS,
@@ -67,24 +66,33 @@ class PreconditionRule:
 # 1. CISCO ASA RULES
 # ==============================================================================
 
+
 def _check_asa_cve_2020_3452_ver(v: str) -> bool:
     """CVE-2020-3452 affects ASA < 9.14.1(10)."""
-    return is_version_in_range(v, min_ver="9.0", max_ver="9.14.1(10)", include_min=True, include_max=False)
+    return is_version_in_range(
+        v, min_ver="9.0", max_ver="9.14.1(10)", include_min=True, include_max=False
+    )
 
 
 def _check_asa_cve_2020_3187_ver(v: str) -> bool:
     """CVE-2020-3187 affects ASA < 9.14.1(15)."""
-    return is_version_in_range(v, min_ver="9.0", max_ver="9.14.1(15)", include_min=True, include_max=False)
+    return is_version_in_range(
+        v, min_ver="9.0", max_ver="9.14.1(15)", include_min=True, include_max=False
+    )
 
 
 def _check_asa_cve_2018_0101_ver(v: str) -> bool:
     """CVE-2018-0101 affects ASA 9.0 to 9.8.2."""
-    return is_version_in_range(v, min_ver="9.0", max_ver="9.8.2", include_min=True, include_max=False)
+    return is_version_in_range(
+        v, min_ver="9.0", max_ver="9.8.2", include_min=True, include_max=False
+    )
 
 
 def _check_asa_cve_2020_3580_ver(v: str) -> bool:
     """CVE-2020-3580 affects ASA < 9.16.2."""
-    return is_version_in_range(v, min_ver="9.0", max_ver="9.16.2", include_min=True, include_max=False)
+    return is_version_in_range(
+        v, min_ver="9.0", max_ver="9.16.2", include_min=True, include_max=False
+    )
 
 
 def _check_asa_cve_2023_20269_ver(v: str) -> bool:
@@ -116,51 +124,69 @@ def _check_asa_cve_2024_20353_ver(v: str) -> bool:
 
 def _check_asa_cve_2024_20358_ver(v: str) -> bool:
     """CVE-2024-20358 (Line Runner) affects ASA 9.12 to 9.20.2."""
-    return is_version_in_range(v, min_ver="9.12.0", max_ver="9.20.2", include_min=True, include_max=True)
+    return is_version_in_range(
+        v, min_ver="9.12.0", max_ver="9.20.2", include_min=True, include_max=True
+    )
 
 
 def _check_asa_cve_2016_6366_ver(v: str) -> bool:
     """CVE-2016-6366 (EXTRABACON) affects ASA < 9.6.2."""
-    return is_version_in_range(v, min_ver="7.0", max_ver="9.6.2", include_min=True, include_max=False)
+    return is_version_in_range(
+        v, min_ver="7.0", max_ver="9.6.2", include_min=True, include_max=False
+    )
 
 
 def _check_asa_cve_2022_20623_ver(v: str) -> bool:
     """CVE-2022-20623 affects ASA 9.7 to 9.16.2."""
-    return is_version_in_range(v, min_ver="9.7.0", max_ver="9.16.2", include_min=True, include_max=False)
+    return is_version_in_range(
+        v, min_ver="9.7.0", max_ver="9.16.2", include_min=True, include_max=False
+    )
 
 
 def _check_asa_cve_2021_1445_ver(v: str) -> bool:
     """CVE-2021-1445 affects ASA < 9.14.2(4)."""
-    return is_version_in_range(v, min_ver="9.0", max_ver="9.14.2(4)", include_min=True, include_max=False)
+    return is_version_in_range(
+        v, min_ver="9.0", max_ver="9.14.2(4)", include_min=True, include_max=False
+    )
 
 
 # ==============================================================================
 # 2. CISCO IOS XE RULES
 # ==============================================================================
 
+
 def _check_ios_xe_cve_2023_20198_ver(v: str) -> bool:
     """CVE-2023-20198 affects IOS XE 16.1.1 through 17.12.1."""
-    return is_version_in_range(v, min_ver="16.1.1", max_ver="17.12.2", include_min=True, include_max=False)
+    return is_version_in_range(
+        v, min_ver="16.1.1", max_ver="17.12.2", include_min=True, include_max=False
+    )
 
 
 def _check_ios_xe_cve_2023_20273_ver(v: str) -> bool:
     """CVE-2023-20273 affects IOS XE 16.1.1 through 17.12.1."""
-    return is_version_in_range(v, min_ver="16.1.1", max_ver="17.12.2", include_min=True, include_max=False)
+    return is_version_in_range(
+        v, min_ver="16.1.1", max_ver="17.12.2", include_min=True, include_max=False
+    )
 
 
 def _check_ios_cve_2017_6742_ver(v: str) -> bool:
     """CVE-2017-6742 (SNMP) affects IOS/IOS XE 15.0 through 16.6.1."""
-    return is_version_in_range(v, min_ver="15.0.0", max_ver="16.6.2", include_min=True, include_max=False)
+    return is_version_in_range(
+        v, min_ver="15.0.0", max_ver="16.6.2", include_min=True, include_max=False
+    )
 
 
 def _check_ios_cve_2018_0171_ver(v: str) -> bool:
     """CVE-2018-0171 (Smart Install) affects IOS/IOS XE 12.2 through 16.6.1."""
-    return is_version_in_range(v, min_ver="12.2.0", max_ver="16.6.2", include_min=True, include_max=False)
+    return is_version_in_range(
+        v, min_ver="12.2.0", max_ver="16.6.2", include_min=True, include_max=False
+    )
 
 
 # ==============================================================================
 # 3. FORTINET FORTIOS RULES
 # ==============================================================================
+
 
 def _check_forti_cve_2024_21762_ver(v: str) -> bool:
     """CVE-2024-21762 affects FortiOS 7.4.0-7.4.2, 7.2.0-7.2.6, 7.0.0-7.0.13, 6.4.0-6.4.14."""
@@ -210,6 +236,7 @@ def _check_forti_cve_2022_40684_ver(v: str) -> bool:
 # 4. PALO ALTO PAN-OS RULES
 # ==============================================================================
 
+
 def _check_pan_cve_2024_3400_ver(v: str) -> bool:
     """CVE-2024-3400 affects PAN-OS 10.2 < 10.2.9, 11.0 < 11.0.4, 11.1 < 11.1.3."""
     if is_version_in_range(v, "10.2.0", "10.2.9", True, False):
@@ -245,6 +272,7 @@ def _check_pan_cve_2020_2021_ver(v: str) -> bool:
 # 5. F5 BIG-IP RULES
 # ==============================================================================
 
+
 def _check_f5_cve_2023_46747_ver(v: str) -> bool:
     """CVE-2023-46747 affects F5 BIG-IP 17.1.0-17.1.1, 16.1.0-16.1.4, 15.1.0-15.1.10."""
     if is_version_in_range(v, "17.1.0", "17.1.1.1", True, False):
@@ -270,6 +298,7 @@ def _check_f5_cve_2022_1388_ver(v: str) -> bool:
 # 6. NETSCOUT ARBOR SIGHTLINE / TMS RULES
 # ==============================================================================
 
+
 def _check_arbor_cve_2020_24368_ver(v: str) -> bool:
     """CVE-2020-24368 affects Sightline < 9.8.0, ArbOS < 7.8.0."""
     if is_version_in_range(v, "9.0.0", "9.8.0", True, False):
@@ -286,6 +315,7 @@ def _check_arbor_cve_2020_24368_ver(v: str) -> bool:
 # ==============================================================================
 # 7. IMPERVA SECURESPHERE WAF RULES
 # ==============================================================================
+
 
 def _check_imperva_cve_2023_38646_ver(v: str) -> bool:
     """CVE-2023-38646 affects SecureSphere < 14.8.0."""
@@ -453,7 +483,6 @@ PRECONDITION_RULES: List[PreconditionRule] = [
         precondition_checker=lambda f: bool(f.get("aaa")),
         references=["https://nvd.nist.gov/vuln/detail/CVE-2021-1445"],
     ),
-
     # ------------------- Cisco IOS XE -------------------
     PreconditionRule(
         cve_id="CVE-2023-20198",
@@ -515,7 +544,6 @@ PRECONDITION_RULES: List[PreconditionRule] = [
         precondition_checker=lambda f: bool(f.get("smart_install")),
         references=["https://nvd.nist.gov/vuln/detail/CVE-2018-0171"],
     ),
-
     # ------------------- Fortinet FortiOS -------------------
     PreconditionRule(
         cve_id="CVE-2024-21762",
@@ -577,7 +605,6 @@ PRECONDITION_RULES: List[PreconditionRule] = [
         precondition_checker=lambda f: bool(f.get("http_server")),
         references=["https://nvd.nist.gov/vuln/detail/CVE-2022-40684"],
     ),
-
     # ------------------- Palo Alto PAN-OS -------------------
     PreconditionRule(
         cve_id="CVE-2024-3400",
@@ -606,7 +633,9 @@ PRECONDITION_RULES: List[PreconditionRule] = [
         precondition_description="URL Filtering policy enabled with Source NAT",
         mitigation_cmd="set rulebase security rules <name> action deny  # upgrade to 10.1.6-h6+ / 10.2.2-h2+",
         version_checker=_check_pan_cve_2022_0028_ver,
-        precondition_checker=lambda f: True,  # Active by default if URL filtering NAT exists
+        precondition_checker=lambda f: (
+            True
+        ),  # Active by default if URL filtering NAT exists
         references=["https://nvd.nist.gov/vuln/detail/CVE-2022-0028"],
     ),
     PreconditionRule(
@@ -624,7 +653,6 @@ PRECONDITION_RULES: List[PreconditionRule] = [
         precondition_checker=lambda f: bool(f.get("aaa")),
         references=["https://nvd.nist.gov/vuln/detail/CVE-2020-2021"],
     ),
-
     # ------------------- F5 BIG-IP -------------------
     PreconditionRule(
         cve_id="CVE-2023-46747",
@@ -671,7 +699,6 @@ PRECONDITION_RULES: List[PreconditionRule] = [
         precondition_checker=lambda f: bool(f.get("http_server")),
         references=["https://support.f5.com/csp/article/K50257404"],
     ),
-
     # ------------------- NETSCOUT Arbor -------------------
     PreconditionRule(
         cve_id="CVE-2020-24368",
@@ -688,7 +715,6 @@ PRECONDITION_RULES: List[PreconditionRule] = [
         precondition_checker=lambda f: bool(f.get("http_server")),
         references=["https://nvd.nist.gov/vuln/detail/CVE-2020-24368"],
     ),
-
     # ------------------- Imperva SecureSphere -------------------
     PreconditionRule(
         cve_id="CVE-2023-38646",
@@ -778,19 +804,18 @@ def get_rules_for_os(os_family: str) -> List[PreconditionRule]:
 
 # Re-export Precondition Evaluators and Triage Engine for seamless backward/forward compatibility
 from src.triage import (  # noqa: E402
-    PreconditionResult,
-    TriageLayer,
-    TriageResult,
-    check_aaa,
-    check_bgp,
-    check_http_server,
-    check_ikev2,
-    check_ospf,
-    check_rest_api,
-    check_smart_install,
-    check_snmp,
-    check_ssh,
-    check_telnet,
-    check_webvpn,
+    PreconditionResult as PreconditionResult,
+    TriageLayer as TriageLayer,
+    TriageResult as TriageResult,
+    check_aaa as check_aaa,
+    check_bgp as check_bgp,
+    check_http_server as check_http_server,
+    check_ikev2 as check_ikev2,
+    check_ospf as check_ospf,
+    check_rest_api as check_rest_api,
+    check_smart_install as check_smart_install,
+    check_snmp as check_snmp,
+    check_ssh as check_ssh,
+    check_telnet as check_telnet,
+    check_webvpn as check_webvpn,
 )
-

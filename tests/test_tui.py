@@ -6,7 +6,7 @@ from textual.containers import VerticalScroll
 from textual.widgets import Button, DataTable, Input, Markdown, Static, TabbedContent
 
 from src.config import OUTPUTS_DIR
-from src.tui.app import DetailScrollContainer, VulnerabilityDetailModal, VulnCheckApp
+from src.tui.app import VulnerabilityDetailModal, VulnCheckApp
 
 ASA_PATH = Path("F:/WORK/NCS_Downloads/Network config/Firewall ASA1.txt")
 IOS_XE_PATH = Path("F:/WORK/NCS_Downloads/cisco_ios_xe_sample_config.txt")
@@ -317,7 +317,11 @@ async def test_tui_self_contained_audit_asa_and_iosxe(tmp_path):
         assert "Cisco ASA" in meta_text
 
         detail = pilot.app.query_one("#detail-content", Markdown)
-        assert "CVE-2024-20353" in detail.source or "CVE-2023-20269" in detail.source or "CVE-2025-20333" in detail.source
+        assert (
+            "CVE-2024-20353" in detail.source
+            or "CVE-2023-20269" in detail.source
+            or "CVE-2025-20333" in detail.source
+        )
         assert "Precondition" in detail.source
         assert "Mitigation" in detail.source
         assert "| Thuộc tính | Chi tiết |" in detail.source
@@ -405,7 +409,9 @@ def test_tui_markdown_detail_tables():
         "precondition_met": True,
         "mitigation_cmd": "no webvpn",
         "description": "A vulnerability in the web server of Cisco ASA Software...",
-        "references": ["https://tools.cisco.com/security/center/content/CiscoSecurityAdvisory/cisco-sa-asa-ssl-dos-g8gmns"],
+        "references": [
+            "https://tools.cisco.com/security/center/content/CiscoSecurityAdvisory/cisco-sa-asa-ssl-dos-g8gmns"
+        ],
     }
     dev_info = {
         "vendor": "Cisco",
@@ -530,7 +536,11 @@ async def test_tui_fullscreen_modal(tmp_path):
 
         # Inspect Markdown content in modal
         modal_md = modal_screen.query_one("#modal-markdown", Markdown)
-        assert "CVE-2024-20353" in modal_md.source or "CVE-2023-20269" in modal_md.source or "CVE-2025-20333" in modal_md.source
+        assert (
+            "CVE-2024-20353" in modal_md.source
+            or "CVE-2023-20269" in modal_md.source
+            or "CVE-2025-20333" in modal_md.source
+        )
         assert "Precondition" in modal_md.source
 
         # 2. Press Escape to close modal
@@ -635,6 +645,3 @@ async def test_tui_triage_filter_buttons_and_modal_evidence(tmp_path):
         await pilot.press("escape")
         await pilot.pause()
         assert len(pilot.app.screen_stack) == 1
-
-
-

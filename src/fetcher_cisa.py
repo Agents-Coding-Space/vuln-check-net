@@ -385,7 +385,9 @@ class CisaKevFetcher:
                     "dateReleased": data.get("dateReleased", ""),
                 }
             except Exception as e:
-                logger.error("Failed to load CISA KEV cache from %s: %s", self.cache_file, e)
+                logger.error(
+                    "Failed to load CISA KEV cache from %s: %s", self.cache_file, e
+                )
 
         # Merge preset records into memory if missing
         for p in PRESET_KEV_ENTRIES:
@@ -454,7 +456,9 @@ class CisaKevFetcher:
         logger.info("Fetching latest CISA KEV catalog from %s ...", CISA_KEV_URL)
         data = self._download_kev_feed()
         if not data:
-            logger.warning("Could not download CISA KEV catalog (offline fallback active).")
+            logger.warning(
+                "Could not download CISA KEV catalog (offline fallback active)."
+            )
             # Ensure preset cache file exists at least
             if not self.cache_file.exists():
                 self._save_merged_cache([])
@@ -546,7 +550,14 @@ class CisaKevFetcher:
         # 3. Try curl CLI subprocess
         try:
             proc = subprocess.run(
-                ["curl", "-s", "-L", "--connect-timeout", str(HTTP_TIMEOUT), CISA_KEV_URL],
+                [
+                    "curl",
+                    "-s",
+                    "-L",
+                    "--connect-timeout",
+                    str(HTTP_TIMEOUT),
+                    CISA_KEV_URL,
+                ],
                 capture_output=True,
                 text=True,
                 encoding="utf-8",

@@ -16,9 +16,7 @@ from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 from rich import box
 from rich.console import Console
-from rich.panel import Panel
 from rich.table import Table
-from rich.text import Text
 
 from src.config import (
     RISK_CRITICAL,
@@ -101,14 +99,32 @@ class Reporter:
         summary = scan_result.get("summary", {})
         vulns = scan_result.get("vulnerabilities", [])
 
-        total_checked = summary.get("total_cves_checked") or summary.get("total_rules_evaluated") or len(vulns)
+        total_checked = (
+            summary.get("total_cves_checked")
+            or summary.get("total_rules_evaluated")
+            or len(vulns)
+        )
         total_matched = summary.get("total_affected_versions", len(vulns))
-        exp_cnt = summary.get("exploitable_count", sum(1 for v in vulns if v.get("status") == STATUS_EXPLOITABLE))
-        mit_cnt = summary.get("mitigated_count", sum(1 for v in vulns if v.get("status") == STATUS_MITIGATED))
-        pot_cnt = summary.get("potential_count", sum(1 for v in vulns if v.get("status") == STATUS_POTENTIAL))
+        exp_cnt = summary.get(
+            "exploitable_count",
+            sum(1 for v in vulns if v.get("status") == STATUS_EXPLOITABLE),
+        )
+        mit_cnt = summary.get(
+            "mitigated_count",
+            sum(1 for v in vulns if v.get("status") == STATUS_MITIGATED),
+        )
+        pot_cnt = summary.get(
+            "potential_count",
+            sum(1 for v in vulns if v.get("status") == STATUS_POTENTIAL),
+        )
         kev_cnt = summary.get("in_kev_count", sum(1 for v in vulns if v.get("in_kev")))
-        crit_cnt = summary.get("critical_count", sum(1 for v in vulns if v.get("real_risk") == RISK_CRITICAL))
-        high_cnt = summary.get("high_count", sum(1 for v in vulns if v.get("real_risk") == RISK_HIGH))
+        crit_cnt = summary.get(
+            "critical_count",
+            sum(1 for v in vulns if v.get("real_risk") == RISK_CRITICAL),
+        )
+        high_cnt = summary.get(
+            "high_count", sum(1 for v in vulns if v.get("real_risk") == RISK_HIGH)
+        )
 
         return {
             "total_cves_checked": int(total_checked),
@@ -131,7 +147,9 @@ class Reporter:
         )
         table.add_column("Assessment Layer / Metric", style="bold white", width=36)
         table.add_column("Count", justify="center", width=12)
-        table.add_column("Operational Significance & Classification", style="dim", width=46)
+        table.add_column(
+            "Operational Significance & Classification", style="dim", width=46
+        )
 
         table.add_row(
             "Authoritative NVD Evaluated",
@@ -180,7 +198,9 @@ class Reporter:
         dev_table.add_row("Domain Name", info.get("domain_name") or "N/A")
         dev_table.add_row("Vendor", info.get("vendor", "Unknown"))
         dev_table.add_row("OS Family", info.get("os_family", "Unknown"))
-        dev_table.add_row("OS Version", f"[bold green]{info.get('version', 'N/A')}[/bold green]")
+        dev_table.add_row(
+            "OS Version", f"[bold green]{info.get('version', 'N/A')}[/bold green]"
+        )
         dev_table.add_row("Hardware Model", info.get("model", "Unknown"))
 
         features = info.get("features", {})
@@ -188,11 +208,15 @@ class Reporter:
         inactive_feats = [k for k, v in features.items() if not v]
         dev_table.add_row(
             "Active Features",
-            ", ".join(f"[red]{f}[/red]" for f in active_feats) if active_feats else "[dim]None[/dim]",
+            ", ".join(f"[red]{f}[/red]" for f in active_feats)
+            if active_feats
+            else "[dim]None[/dim]",
         )
         dev_table.add_row(
             "Inactive Features",
-            ", ".join(f"[dim green]{f}[/dim green]" for f in inactive_feats) if inactive_feats else "[dim]None[/dim]",
+            ", ".join(f"[dim green]{f}[/dim green]" for f in inactive_feats)
+            if inactive_feats
+            else "[dim]None[/dim]",
         )
         return dev_table
 
@@ -204,7 +228,9 @@ class Reporter:
     ) -> Table:
         """Build Rich Table with vulnerability findings, Triage badges, and CISA KEV indicators."""
         vulns = scan_result.get("vulnerabilities", [])
-        filtered = self.filter_vulnerabilities(vulns, filter_triage=filter_triage, kev_only=kev_only)
+        filtered = self.filter_vulnerabilities(
+            vulns, filter_triage=filter_triage, kev_only=kev_only
+        )
 
         filter_desc = []
         if filter_triage and filter_triage.lower() != "all":
@@ -247,7 +273,9 @@ class Reporter:
 
             kev_text = "[bold red][!] KEV[/]" if v.get("in_kev") else "[dim]No[/dim]"
 
-            evidence_text = v.get("feature_evidence") or v.get("precondition_description") or ""
+            evidence_text = (
+                v.get("feature_evidence") or v.get("precondition_description") or ""
+            )
             if len(evidence_text) > 36:
                 evidence_text = evidence_text[:34] + "..."
 
@@ -276,21 +304,33 @@ class Reporter:
     ) -> None:
         """Print full terminal audit results including Authoritative Data Source, Breakdown, and Findings."""
         out = console or Console()
-        out.print("[bold green]Authoritative Data Source: NIST NVD API 2.0 (Local SQLite Cache) + CISA KEV Feed[/bold green]")
+        out.print(
+            "[bold green]Authoritative Data Source: NIST NVD API 2.0 (Local SQLite Cache) + CISA KEV Feed[/bold green]"
+        )
         out.print(self.build_metadata_table(scan_result))
         out.print(self.build_breakdown_table(scan_result))
 
         vulns = scan_result.get("vulnerabilities", [])
-        filtered = self.filter_vulnerabilities(vulns, filter_triage=filter_triage, kev_only=kev_only)
+        filtered = self.filter_vulnerabilities(
+            vulns, filter_triage=filter_triage, kev_only=kev_only
+        )
 
         if not filtered:
             if not vulns:
-                out.print("[green]✔ No matching vulnerabilities found for this device OS version.[/green]\n")
+                out.print(
+                    "[green]✔ No matching vulnerabilities found for this device OS version.[/green]\n"
+                )
             else:
-                out.print(f"[yellow]No findings match the current filter (triage={filter_triage or 'all'}, kev_only={kev_only}). Total findings: {len(vulns)}.[/yellow]\n")
+                out.print(
+                    f"[yellow]No findings match the current filter (triage={filter_triage or 'all'}, kev_only={kev_only}). Total findings: {len(vulns)}.[/yellow]\n"
+                )
             return
 
-        out.print(self.build_summary_table(scan_result, filter_triage=filter_triage, kev_only=kev_only))
+        out.print(
+            self.build_summary_table(
+                scan_result, filter_triage=filter_triage, kev_only=kev_only
+            )
+        )
         out.print("")
 
     # =========================================================================
@@ -348,15 +388,33 @@ class Reporter:
             lines.append("### 2. Audit Executive Summary")
             lines.append("| Metric | Count | Description |")
             lines.append("| :--- | :--- | :--- |")
-            lines.append(f"| **Authoritative Data Source** | NIST NVD API 2.0 + CISA KEV | Authoritative CVE & KEV threat catalogs |")
-            lines.append(f"| **Total NVD Checked** | {summary.get('total_cves_checked', summary.get('total_rules_evaluated', 0))} | Total vendor CVE rules tested |")
-            lines.append(f"| **Total NVD Matched** | {summary.get('total_affected_versions', 0)} | CVEs matching OS version (Necessary Condition) |")
-            lines.append(f"| :fire: **[EXPLOITABLE] (Action Required)** | **{summary.get('exploitable_count', 0)}** | Precondition active in config (Sufficient Condition) |")
-            lines.append(f"| :warning: **[POTENTIAL] (Version Affected)** | **{summary.get('potential_count', 0)}** | Core OS flaw or unverified precondition (Affected by Version) |")
-            lines.append(f"| :shield: **[MITIGATED] (False Positives Avoided)** | **{summary.get('mitigated_count', 0)}** | Feature disabled in config (Real Risk neutralized) |")
-            lines.append(f"| :rotating_light: **[!] CISA KEV** | **{summary.get('in_kev_count', 0)}** | Known Exploited in the Wild / Ransomware campaigns |")
-            lines.append(f"| **Critical Real Risk** | {summary.get('critical_count', 0)} | Immediate remediation priority |")
-            lines.append(f"| **High Real Risk** | {summary.get('high_count', 0)} | High remediation priority |")
+            lines.append(
+                "| **Authoritative Data Source** | NIST NVD API 2.0 + CISA KEV | Authoritative CVE & KEV threat catalogs |"
+            )
+            lines.append(
+                f"| **Total NVD Checked** | {summary.get('total_cves_checked', summary.get('total_rules_evaluated', 0))} | Total vendor CVE rules tested |"
+            )
+            lines.append(
+                f"| **Total NVD Matched** | {summary.get('total_affected_versions', 0)} | CVEs matching OS version (Necessary Condition) |"
+            )
+            lines.append(
+                f"| :fire: **[EXPLOITABLE] (Action Required)** | **{summary.get('exploitable_count', 0)}** | Precondition active in config (Sufficient Condition) |"
+            )
+            lines.append(
+                f"| :warning: **[POTENTIAL] (Version Affected)** | **{summary.get('potential_count', 0)}** | Core OS flaw or unverified precondition (Affected by Version) |"
+            )
+            lines.append(
+                f"| :shield: **[MITIGATED] (False Positives Avoided)** | **{summary.get('mitigated_count', 0)}** | Feature disabled in config (Real Risk neutralized) |"
+            )
+            lines.append(
+                f"| :rotating_light: **[!] CISA KEV** | **{summary.get('in_kev_count', 0)}** | Known Exploited in the Wild / Ransomware campaigns |"
+            )
+            lines.append(
+                f"| **Critical Real Risk** | {summary.get('critical_count', 0)} | Immediate remediation priority |"
+            )
+            lines.append(
+                f"| **High Real Risk** | {summary.get('high_count', 0)} | High remediation priority |"
+            )
             lines.append("")
 
             # 3. Active Features
@@ -364,16 +422,24 @@ class Reporter:
             lines.append("| Feature | State in Config | Security Significance |")
             lines.append("| :--- | :--- | :--- |")
             for feat, is_on in features.items():
-                status_icon = "ENABLED :warning:" if is_on else "DISABLED :white_check_mark:"
-                lines.append(f"| `{feat}` | **{status_icon}** | {'Attack surface exposed' if is_on else 'Attack surface closed'} |")
+                status_icon = (
+                    "ENABLED :warning:" if is_on else "DISABLED :white_check_mark:"
+                )
+                lines.append(
+                    f"| `{feat}` | **{status_icon}** | {'Attack surface exposed' if is_on else 'Attack surface closed'} |"
+                )
             lines.append("")
 
             # 4. Detailed Vulnerability Table
             lines.append("### 4. Vulnerability Assessment Findings")
             if not vulns:
-                lines.append("*No vulnerabilities matching the device OS version were identified.*\n")
+                lines.append(
+                    "*No vulnerabilities matching the device OS version were identified.*\n"
+                )
             else:
-                lines.append("| CVE ID | Title | Triage | Real Risk | CVSS | CISA KEV | Precondition Met? |")
+                lines.append(
+                    "| CVE ID | Title | Triage | Real Risk | CVSS | CISA KEV | Precondition Met? |"
+                )
                 lines.append("| :--- | :--- | :--- | :--- | :--- | :--- | :--- |")
                 for v in vulns:
                     status_badge = f"**`[{v['status']}]`**"
@@ -388,31 +454,53 @@ class Reporter:
                 # 5. Technical Cards for Exploitable & Mitigated
                 lines.append("### 5. Technical Details & Remediation Playbook")
                 for v in vulns:
-                    lines.append(f"#### <a id=\"{v['cve_id'].lower()}\"></a>{v['cve_id']} - {v['title']}")
+                    lines.append(
+                        f'#### <a id="{v["cve_id"].lower()}"></a>{v["cve_id"]} - {v["title"]}'
+                    )
                     if v.get("status") == STATUS_EXPLOITABLE:
                         status_note = "Vulnerable service active and reachable"
                     elif v.get("status") == STATUS_MITIGATED:
-                        status_note = "Feature inactive; vulnerability dormant/mitigated"
+                        status_note = (
+                            "Feature inactive; vulnerability dormant/mitigated"
+                        )
                     else:
                         status_note = "Affected by Version; OS core flaw or precondition unverified"
-                    lines.append(f"- **Triage Status**: `[{v['status']}]` ({status_note})")
-                    lines.append(f"- **Real Operational Risk**: **{v['real_risk']}** (CVSS: {v['base_score']})")
+                    lines.append(
+                        f"- **Triage Status**: `[{v['status']}]` ({status_note})"
+                    )
+                    lines.append(
+                        f"- **Real Operational Risk**: **{v['real_risk']}** (CVSS: {v['base_score']})"
+                    )
                     if v.get("feature_evidence"):
-                        lines.append(f"- **Feature Evidence**: `{v['feature_evidence']}`")
+                        lines.append(
+                            f"- **Feature Evidence**: `{v['feature_evidence']}`"
+                        )
                     if v.get("mitigation_reason"):
                         lines.append(f"- **Triage Reason**: {v['mitigation_reason']}")
                     if v.get("in_kev"):
                         kev_det = v.get("kev_details", {})
-                        lines.append(f"- **CISA KEV Alert**: Listed on CISA KEV (Date Added: {kev_det.get('date_added', 'N/A')}). Ransomware use: `{kev_det.get('ransomware_campaign', 'Unknown')}`")
+                        lines.append(
+                            f"- **CISA KEV Alert**: Listed on CISA KEV (Date Added: {kev_det.get('date_added', 'N/A')}). Ransomware use: `{kev_det.get('ransomware_campaign', 'Unknown')}`"
+                        )
                         if kev_det.get("required_action"):
-                            lines.append(f"- **CISA Required Action**: {kev_det.get('required_action')}")
-                    lines.append(f"- **Affected OS Versions**: `{v.get('affected_versions', 'N/A')}`")
-                    lines.append(f"- **Triggering Precondition**: {v.get('precondition_description', 'N/A')}")
-                    lines.append(f"- **Precondition Active on Device**: `{'YES' if v.get('precondition_met') else 'NO'}`")
+                            lines.append(
+                                f"- **CISA Required Action**: {kev_det.get('required_action')}"
+                            )
+                    lines.append(
+                        f"- **Affected OS Versions**: `{v.get('affected_versions', 'N/A')}`"
+                    )
+                    lines.append(
+                        f"- **Triggering Precondition**: {v.get('precondition_description', 'N/A')}"
+                    )
+                    lines.append(
+                        f"- **Precondition Active on Device**: `{'YES' if v.get('precondition_met') else 'NO'}`"
+                    )
                     lines.append(f"- **Description**: {v.get('description', '')}")
                     lines.append("- **Remediation / Hardening CLI Command**:")
                     lines.append("```bash")
-                    lines.append(v.get("mitigation_cmd", "# No mitigation command provided"))
+                    lines.append(
+                        v.get("mitigation_cmd", "# No mitigation command provided")
+                    )
                     lines.append("```")
                     if v.get("references"):
                         lines.append(f"- **References**: {', '.join(v['references'])}")
@@ -454,38 +542,55 @@ class Reporter:
         wb.remove(wb.active)
 
         # Style definitions
-        navy_header_fill = PatternFill(start_color="1B365D", end_color="1B365D", fill_type="solid")
+        navy_header_fill = PatternFill(
+            start_color="1B365D", end_color="1B365D", fill_type="solid"
+        )
         header_font = Font(name="Segoe UI", size=11, bold=True, color="FFFFFF")
         regular_font = Font(name="Segoe UI", size=10)
         bold_font = Font(name="Segoe UI", size=10, bold=True)
         center_align = Alignment(horizontal="center", vertical="center")
         left_align = Alignment(horizontal="left", vertical="center")
-        wrap_align = Alignment(horizontal="left", vertical="center", wrap_text=True)
 
         border_thin = Side(border_style="thin", color="D3D3D3")
-        cell_border = Border(top=border_thin, left=border_thin, right=border_thin, bottom=border_thin)
+        cell_border = Border(
+            top=border_thin, left=border_thin, right=border_thin, bottom=border_thin
+        )
 
         # Status Fills
-        fill_exploitable = PatternFill(start_color="FFC7CE", end_color="FFC7CE", fill_type="solid")
+        fill_exploitable = PatternFill(
+            start_color="FFC7CE", end_color="FFC7CE", fill_type="solid"
+        )
         font_exploitable = Font(name="Segoe UI", size=10, bold=True, color="9C0006")
 
-        fill_mitigated = PatternFill(start_color="C6EFCE", end_color="C6EFCE", fill_type="solid")
+        fill_mitigated = PatternFill(
+            start_color="C6EFCE", end_color="C6EFCE", fill_type="solid"
+        )
         font_mitigated = Font(name="Segoe UI", size=10, bold=True, color="006100")
 
-        fill_potential = PatternFill(start_color="FFF2CC", end_color="FFF2CC", fill_type="solid")
+        fill_potential = PatternFill(
+            start_color="FFF2CC", end_color="FFF2CC", fill_type="solid"
+        )
         font_potential = Font(name="Segoe UI", size=10, bold=True, color="B45F06")
 
         # Risk Fills
-        fill_critical = PatternFill(start_color="D9534F", end_color="D9534F", fill_type="solid")
+        fill_critical = PatternFill(
+            start_color="D9534F", end_color="D9534F", fill_type="solid"
+        )
         font_critical = Font(name="Segoe UI", size=10, bold=True, color="FFFFFF")
 
-        fill_high = PatternFill(start_color="F0AD4E", end_color="F0AD4E", fill_type="solid")
+        fill_high = PatternFill(
+            start_color="F0AD4E", end_color="F0AD4E", fill_type="solid"
+        )
         font_high = Font(name="Segoe UI", size=10, bold=True, color="FFFFFF")
 
-        fill_medium = PatternFill(start_color="FCF8E3", end_color="FCF8E3", fill_type="solid")
+        fill_medium = PatternFill(
+            start_color="FCF8E3", end_color="FCF8E3", fill_type="solid"
+        )
         font_medium = Font(name="Segoe UI", size=10, bold=True, color="8A6D3B")
 
-        fill_low = PatternFill(start_color="DFF0D8", end_color="DFF0D8", fill_type="solid")
+        fill_low = PatternFill(
+            start_color="DFF0D8", end_color="DFF0D8", fill_type="solid"
+        )
         font_low = Font(name="Segoe UI", size=10, bold=True, color="3C763D")
 
         # -------------------------------------------------------------
@@ -695,7 +800,9 @@ class Reporter:
                     if cell.row == 1 and sheet == ws_sum:
                         continue  # Skip merged banner
                     max_len = max(max_len, len(val_str))
-                sheet.column_dimensions[col_letter].width = min(max(max_len + 3, 12), 70)
+                sheet.column_dimensions[col_letter].width = min(
+                    max(max_len + 3, 12), 70
+                )
 
         wb.save(path)
         return str(path)

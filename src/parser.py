@@ -202,9 +202,8 @@ class ConfigParser:
             return VENDOR_CISCO, OS_CISCO_IOS_XE
 
         # 7. Cisco IOS Classic
-        if (
-            re.search(r"Cisco IOS Software", text, re.I)
-            or re.search(r"^\s*version\s+1[125]\.", text, re.M | re.I)
+        if re.search(r"Cisco IOS Software", text, re.I) or re.search(
+            r"^\s*version\s+1[125]\.", text, re.M | re.I
         ):
             return VENDOR_CISCO, OS_CISCO_IOS_CLASSIC
 
@@ -298,7 +297,9 @@ class ConfigParser:
                 return m2.group(1).strip()
 
         # Fallback generic version pattern
-        m_gen = re.search(r"(?:version|ver|sw-version)[\s:=]+([0-9\.\(\)\-a-zA-Z]+)", text, re.I)
+        m_gen = re.search(
+            r"(?:version|ver|sw-version)[\s:=]+([0-9\.\(\)\-a-zA-Z]+)", text, re.I
+        )
         return m_gen.group(1).strip() if m_gen else ""
 
     def _extract_hostname(self, text: str, os_family: str) -> str:
@@ -320,7 +321,9 @@ class ConfigParser:
                 return m2.group(1).strip()
 
         elif os_family == OS_F5_BIGIP:
-            m = re.search(r"sys global-settings\s*\{[\s\S]*?hostname\s+([^\s;\}]+)", text, re.I)
+            m = re.search(
+                r"sys global-settings\s*\{[\s\S]*?hostname\s+([^\s;\}]+)", text, re.I
+            )
             if m:
                 return m.group(1).strip()
             m2 = re.search(r"^\s*hostname\s+([^\s;\}]+)", text, re.M | re.I)
@@ -449,7 +452,9 @@ class ConfigParser:
                 re.search(r"^\s*ip\s+http\s+(?:secure-)?server\b", text, re.M | re.I)
             )
             no_http = bool(
-                re.search(r"^\s*no\s+ip\s+http\s+(?:secure-)?server\b", text, re.M | re.I)
+                re.search(
+                    r"^\s*no\s+ip\s+http\s+(?:secure-)?server\b", text, re.M | re.I
+                )
             )
             features["http_server"] = has_http and not no_http
         elif os_family == OS_FORTINET_FORTIOS:
@@ -459,7 +464,9 @@ class ConfigParser:
         elif os_family == OS_PALOALTO_PANOS:
             has_profile_http = bool(
                 re.search(r"<(?:http|https)>yes</(?:http|https)>", text, re.I)
-                or re.search(r"interface-management-profile[\s\S]*?\bhttps?\s+yes\b", text, re.I)
+                or re.search(
+                    r"interface-management-profile[\s\S]*?\bhttps?\s+yes\b", text, re.I
+                )
             )
             http_explicit_disable = bool(
                 re.search(r"<disable-http>yes</disable-http>", text, re.I)
@@ -510,10 +517,9 @@ class ConfigParser:
                         if sub_indent <= base_indent:
                             break
                         cmd = sub_line.strip()
-                        if (
-                            re.match(r"^enable\s+(?!password\b)\S+", cmd, re.I)
-                            or re.match(r"^anyconnect\s+enable\b", cmd, re.I)
-                        ):
+                        if re.match(
+                            r"^enable\s+(?!password\b)\S+", cmd, re.I
+                        ) or re.match(r"^anyconnect\s+enable\b", cmd, re.I):
                             webvpn_enabled = True
                             break
                         i += 1
@@ -531,7 +537,11 @@ class ConfigParser:
             features["ssl_vpn"] = features["webvpn"]
         elif os_family == OS_FORTINET_FORTIOS:
             features["ssl_vpn"] = bool(
-                re.search(r"config\s+vpn\s+ssl\s+settings[\s\S]*?set\s+status\s+enable", text, re.I)
+                re.search(
+                    r"config\s+vpn\s+ssl\s+settings[\s\S]*?set\s+status\s+enable",
+                    text,
+                    re.I,
+                )
             )
             features["webvpn"] = features["ssl_vpn"]
         elif os_family == OS_PALOALTO_PANOS:
@@ -548,13 +558,19 @@ class ConfigParser:
             features["snmp_server"] = bool(active_snmp)
         elif os_family == OS_FORTINET_FORTIOS:
             features["snmp_server"] = bool(
-                re.search(r"config\s+system\s+snmp\s+sysinfo[\s\S]*?set\s+status\s+enable", text, re.I)
+                re.search(
+                    r"config\s+system\s+snmp\s+sysinfo[\s\S]*?set\s+status\s+enable",
+                    text,
+                    re.I,
+                )
                 or re.search(r"config\s+system\s+snmp\s+community", text, re.I)
             )
         elif os_family == OS_PALOALTO_PANOS:
             has_profile_snmp = bool(
                 re.search(r"<snmp>yes</snmp>", text, re.I)
-                or re.search(r"interface-management-profile[\s\S]*?\bsnmp\s+yes\b", text, re.I)
+                or re.search(
+                    r"interface-management-profile[\s\S]*?\bsnmp\s+yes\b", text, re.I
+                )
             )
             snmp_explicit_disable = bool(
                 re.search(r"<disable-snmp>yes</disable-snmp>", text, re.I)
@@ -574,9 +590,7 @@ class ConfigParser:
             else:
                 features["snmp_server"] = snmp_explicit_enable
         elif os_family == OS_F5_BIGIP:
-            features["snmp_server"] = bool(
-                re.search(r"\bsys\s+snmp\b", text, re.I)
-            )
+            features["snmp_server"] = bool(re.search(r"\bsys\s+snmp\b", text, re.I))
         elif os_family == OS_ARBOR_ARBOS:
             features["snmp_server"] = bool(
                 re.search(r"services\s+snmp\s+status\s+set\s+enabled", text, re.I)
@@ -600,7 +614,9 @@ class ConfigParser:
         elif os_family == OS_PALOALTO_PANOS:
             has_profile_telnet = bool(
                 re.search(r"<telnet>yes</telnet>", text, re.I)
-                or re.search(r"interface-management-profile[\s\S]*?\btelnet\s+yes\b", text, re.I)
+                or re.search(
+                    r"interface-management-profile[\s\S]*?\btelnet\s+yes\b", text, re.I
+                )
             )
             telnet_explicit_disable = bool(
                 re.search(r"<disable-telnet>yes</disable-telnet>", text, re.I)
@@ -634,7 +650,9 @@ class ConfigParser:
         elif os_family == OS_PALOALTO_PANOS:
             has_profile_ssh = bool(
                 re.search(r"<ssh>yes</ssh>", text, re.I)
-                or re.search(r"interface-management-profile[\s\S]*?\bssh\s+yes\b", text, re.I)
+                or re.search(
+                    r"interface-management-profile[\s\S]*?\bssh\s+yes\b", text, re.I
+                )
             )
             ssh_explicit_disable = bool(
                 re.search(r"<disable-ssh>yes</disable-ssh>", text, re.I)
@@ -661,9 +679,7 @@ class ConfigParser:
                 re.search(r"services\s+ssh\s+status\s+set\s+enabled", text, re.I)
             )
         elif os_family == OS_IMPERVA_SECURESPHERE:
-            features["ssh"] = bool(
-                re.search(r'"sshEnabled":\s*true', text, re.I)
-            )
+            features["ssh"] = bool(re.search(r'"sshEnabled":\s*true', text, re.I))
 
         # 6. Routing: BGP & OSPF
         features["bgp"] = bool(
@@ -674,17 +690,25 @@ class ConfigParser:
             )
         )
         features["ospf"] = bool(
-            re.search(r"(?:router\s+ospf|config\s+router\s+ospf|protocol\s+ospf)", text, re.I)
+            re.search(
+                r"(?:router\s+ospf|config\s+router\s+ospf|protocol\s+ospf)", text, re.I
+            )
         )
 
         # 7. AAA
         if os_family == OS_CISCO_ASA:
             features["aaa"] = bool(
-                re.search(r"^\s*aaa\s+(?:authentication|authorization|accounting)\b", text, re.M | re.I)
+                re.search(
+                    r"^\s*aaa\s+(?:authentication|authorization|accounting)\b",
+                    text,
+                    re.M | re.I,
+                )
                 or re.search(r"^\s*aaa-server\b", text, re.M | re.I)
             )
         elif os_family in (OS_CISCO_IOS_XE, OS_CISCO_IOS_CLASSIC):
-            features["aaa"] = bool(re.search(r"^\s*aaa\s+new-model\b", text, re.M | re.I))
+            features["aaa"] = bool(
+                re.search(r"^\s*aaa\s+new-model\b", text, re.M | re.I)
+            )
         elif os_family == OS_FORTINET_FORTIOS:
             features["aaa"] = bool(
                 re.search(r"config\s+user\s+(?:ldap|radius|tacacs\+)", text, re.I)

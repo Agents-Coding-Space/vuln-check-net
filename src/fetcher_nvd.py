@@ -915,7 +915,9 @@ class NVDDatabase:
             row = cursor.fetchone()
             return row[0] if row else 0
 
-    def get_cve(self, cve_id: str, fetch_remote: bool = False) -> Optional[Dict[str, Any]]:
+    def get_cve(
+        self, cve_id: str, fetch_remote: bool = False
+    ) -> Optional[Dict[str, Any]]:
         """Retrieve CVE record from SQLite database.
 
         Args:
@@ -1032,7 +1034,9 @@ class NVDFetcher(NVDDatabase):
         self.api_key = api_key if api_key is not None else NVD_API_KEY
         self.last_request_time = 0.0
 
-    def get_cve(self, cve_id: str, fetch_remote: bool = False) -> Optional[Dict[str, Any]]:
+    def get_cve(
+        self, cve_id: str, fetch_remote: bool = False
+    ) -> Optional[Dict[str, Any]]:
         """Retrieve CVE details from SQLite cache or optionally query remote NVD API."""
         if not cve_id:
             return None
@@ -1220,10 +1224,7 @@ class NVDFetcher(NVDDatabase):
             exact_version = None
             if len(parts) >= 6 and parts[5] not in ("*", "-", ""):
                 exact_version = (
-                    parts[5]
-                    .replace(r"\(", "(")
-                    .replace(r"\)", ")")
-                    .replace(r"\_", "_")
+                    parts[5].replace(r"\(", "(").replace(r"\)", ")").replace(r"\_", "_")
                 )
 
             v_start_inc = match.get("versionStartIncluding")

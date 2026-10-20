@@ -23,11 +23,6 @@ from src.config import (
     OS_FORTINET_FORTIOS,
     OS_IMPERVA_SECURESPHERE,
     OS_PALOALTO_PANOS,
-    RISK_CRITICAL,
-    RISK_HIGH,
-    STATUS_EXPLOITABLE,
-    STATUS_MITIGATED,
-    STATUS_POTENTIAL,
     VENDOR_CISCO,
     VENDOR_F5,
     VENDOR_FORTINET,
@@ -37,7 +32,6 @@ from src.config import (
 )
 from src.engine import CorrelationEngine
 from src.fetcher_cisa import CisaKevFetcher
-from src.parser import ConfigParser
 from src.reporter import Reporter
 
 console = Console()
@@ -76,29 +70,36 @@ def handle_scan(args: argparse.Namespace) -> None:
     if args.file:
         fpath = Path(args.file)
         if not fpath.exists():
-            console.print(f"[bold red]Error: Specified file not found: {fpath}[/bold red]")
+            console.print(
+                f"[bold red]Error: Specified file not found: {fpath}[/bold red]"
+            )
             sys.exit(1)
         files_to_scan.append(fpath)
 
     elif args.dir:
         dpath = Path(args.dir)
         if not dpath.exists() or not dpath.is_dir():
-            console.print(f"[bold red]Error: Specified directory not found: {dpath}[/bold red]")
+            console.print(
+                f"[bold red]Error: Specified directory not found: {dpath}[/bold red]"
+            )
             sys.exit(1)
         for ext in ("*.txt", "*.cfg", "*.conf", "*.log"):
             files_to_scan.extend(dpath.glob(ext))
 
     if not files_to_scan:
-        console.print("[bold yellow]No configuration files found to scan.[/bold yellow]")
+        console.print(
+            "[bold yellow]No configuration files found to scan.[/bold yellow]"
+        )
         sys.exit(1)
 
-    parser = ConfigParser()
     engine = CorrelationEngine()
     reporter = Reporter()
 
     all_results = []
 
-    with console.status(f"[cyan]Auditing {len(files_to_scan)} configuration file(s)...[/cyan]") as status:
+    with console.status(
+        f"[cyan]Auditing {len(files_to_scan)} configuration file(s)...[/cyan]"
+    ):
         for f in files_to_scan:
             try:
                 with open(f, "r", encoding="utf-8", errors="ignore") as fp:
@@ -119,7 +120,9 @@ def handle_scan(args: argparse.Namespace) -> None:
     # Export reports if requested
     if args.out_md:
         out_p = reporter.export_markdown(all_results, args.out_md)
-        console.print(f"[bold green]✔ Markdown report exported to: {out_p}[/bold green]")
+        console.print(
+            f"[bold green]✔ Markdown report exported to: {out_p}[/bold green]"
+        )
 
     if args.out_xlsx:
         out_p = reporter.export_excel(all_results, args.out_xlsx)
@@ -164,13 +167,19 @@ def handle_lookup(args: argparse.Namespace) -> None:
             os_family = OS_CISCO_ASA
 
     engine = CorrelationEngine()
-    results = engine.evaluate_version_only(vendor=vendor, os_family=os_family, version=version)
+    results = engine.evaluate_version_only(
+        vendor=vendor, os_family=os_family, version=version
+    )
 
     if getattr(args, "kev_only", False):
         results = [r for r in results if r.get("in_kev")]
     if getattr(args, "triage", "all") != "all":
         target = args.triage.strip().lower()
-        results = [r for r in results if (r.get("status") or r.get("triage_status", "")).strip().lower() == target]
+        results = [
+            r
+            for r in results
+            if (r.get("status") or r.get("triage_status", "")).strip().lower() == target
+        ]
 
     console.print(
         Panel(
@@ -183,7 +192,9 @@ def handle_lookup(args: argparse.Namespace) -> None:
     )
 
     if not results:
-        console.print(f"[green]✔ No known CVE rules match {os_family} version {version}.[/green]")
+        console.print(
+            f"[green]✔ No known CVE rules match {os_family} version {version}.[/green]"
+        )
         return
 
     table = Table(box=box.ROUNDED, header_style="bold cyan")
@@ -198,7 +209,9 @@ def handle_lookup(args: argparse.Namespace) -> None:
         kev_txt = "[bold red]YES[/]" if item.get("in_kev") else "[dim]NO[/dim]"
         table.add_row(
             item.get("cve_id"),
-            item.get("title")[:32] + "..." if len(item.get("title", "")) > 32 else item.get("title", ""),
+            item.get("title")[:32] + "..."
+            if len(item.get("title", "")) > 32
+            else item.get("title", ""),
             str(item.get("base_score", "")),
             kev_txt,
             item.get("precondition_description", ""),
@@ -215,9 +228,13 @@ def handle_update_kev(args: argparse.Namespace) -> None:
     console.print("[yellow]Updating CISA KEV catalog from official feed...[/yellow]")
     success = fetcher.update_cache(force=True)
     if success:
-        console.print(f"[bold green]✔ Successfully updated CISA KEV catalog! New count: {fetcher.count()}[/bold green]")
+        console.print(
+            f"[bold green]✔ Successfully updated CISA KEV catalog! New count: {fetcher.count()}[/bold green]"
+        )
     else:
-        console.print("[yellow]Notice: Could not update from internet. Retaining cached/seed data.[/yellow]")
+        console.print(
+            "[yellow]Notice: Could not update from internet. Retaining cached/seed data.[/yellow]"
+        )
 
 
 def handle_tui(args: argparse.Namespace) -> None:
@@ -239,9 +256,13 @@ def main() -> None:
     subparsers = parser.add_subparsers(dest="subcommand", help="Available subcommands")
 
     # scan subcommand
-    p_scan = subparsers.add_parser("scan", help="Scan network device configuration file or directory")
+    p_scan = subparsers.add_parser(
+        "scan", help="Scan network device configuration file or directory"
+    )
     p_scan.add_argument("--file", "-f", help="Path to single configuration file")
-    p_scan.add_argument("--dir", "-d", help="Path to directory containing configuration files")
+    p_scan.add_argument(
+        "--dir", "-d", help="Path to directory containing configuration files"
+    )
     p_scan.add_argument(
         "--triage",
         "--filter-triage",
@@ -261,10 +282,21 @@ def main() -> None:
     p_scan.add_argument("--out-json", help="Path to export JSON output (.json)")
 
     # lookup subcommand
-    p_lookup = subparsers.add_parser("lookup", help="Look up potential CVEs by vendor and OS version")
-    p_lookup.add_argument("--vendor", "-v", required=True, help="Vendor (e.g. Cisco, Fortinet, Palo Alto)")
-    p_lookup.add_argument("--version", "-ver", required=True, help="OS version string (e.g. 9.20(3), 17.3.1, 7.2.4)")
-    p_lookup.add_argument("--os", help="Specific OS family (e.g. 'Cisco ASA', 'Cisco IOS XE')")
+    p_lookup = subparsers.add_parser(
+        "lookup", help="Look up potential CVEs by vendor and OS version"
+    )
+    p_lookup.add_argument(
+        "--vendor", "-v", required=True, help="Vendor (e.g. Cisco, Fortinet, Palo Alto)"
+    )
+    p_lookup.add_argument(
+        "--version",
+        "-ver",
+        required=True,
+        help="OS version string (e.g. 9.20(3), 17.3.1, 7.2.4)",
+    )
+    p_lookup.add_argument(
+        "--os", help="Specific OS family (e.g. 'Cisco ASA', 'Cisco IOS XE')"
+    )
     p_lookup.add_argument(
         "--triage",
         "--filter-triage",
@@ -281,11 +313,17 @@ def main() -> None:
     )
 
     # update-kev subcommand
-    subparsers.add_parser("update-kev", help="Fetch latest CISA Known Exploited Vulnerabilities catalog")
+    subparsers.add_parser(
+        "update-kev", help="Fetch latest CISA Known Exploited Vulnerabilities catalog"
+    )
 
     # tui subcommand
-    p_tui = subparsers.add_parser("tui", help="Launch interactive Terminal User Interface (TUI)")
-    p_tui.add_argument("--file", "-f", help="Initial configuration file to audit in TUI")
+    p_tui = subparsers.add_parser(
+        "tui", help="Launch interactive Terminal User Interface (TUI)"
+    )
+    p_tui.add_argument(
+        "--file", "-f", help="Initial configuration file to audit in TUI"
+    )
 
     args = parser.parse_args()
 
@@ -296,7 +334,9 @@ def main() -> None:
     if args.subcommand == "scan":
         if not args.file and not args.dir:
             p_scan.print_help()
-            console.print("[bold red]\nError: You must provide either --file or --dir[/bold red]")
+            console.print(
+                "[bold red]\nError: You must provide either --file or --dir[/bold red]"
+            )
             sys.exit(1)
         handle_scan(args)
     elif args.subcommand == "lookup":

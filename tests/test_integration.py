@@ -34,7 +34,9 @@ ARBOR_PATH = Path("F:/WORK/NCS_Downloads/arbor_sightline_tms_sample_config.txt")
 IMPERVA_PATH = Path("F:/WORK/NCS_Downloads/imperva_waf_sample_config.txt")
 
 
-@pytest.mark.skipif(not ASA_CONFIG_PATH.exists(), reason="Real ASA config file not accessible")
+@pytest.mark.skipif(
+    not ASA_CONFIG_PATH.exists(), reason="Real ASA config file not accessible"
+)
 def test_real_asa_firewall_audit():
     with open(ASA_CONFIG_PATH, "r", encoding="utf-8", errors="ignore") as f:
         config_text = f.read()
@@ -104,7 +106,9 @@ def test_real_asa_firewall_audit():
         test_json.unlink()
 
 
-@pytest.mark.skipif(not CISCO_IOS_XE_PATH.exists(), reason="Cisco IOS XE config not accessible")
+@pytest.mark.skipif(
+    not CISCO_IOS_XE_PATH.exists(), reason="Cisco IOS XE config not accessible"
+)
 def test_cisco_ios_xe_sample_audit():
     with open(CISCO_IOS_XE_PATH, "r", encoding="utf-8", errors="ignore") as f:
         config_text = f.read()
@@ -131,7 +135,9 @@ def test_cisco_ios_xe_sample_audit():
     assert vulns["CVE-2023-20273"]["in_kev"] is True
 
 
-@pytest.mark.skipif(not FORTIGATE_PATH.exists(), reason="FortiGate config not accessible")
+@pytest.mark.skipif(
+    not FORTIGATE_PATH.exists(), reason="FortiGate config not accessible"
+)
 def test_fortigate_fortios_sample_audit():
     with open(FORTIGATE_PATH, "r", encoding="utf-8", errors="ignore") as f:
         config_text = f.read()
@@ -153,7 +159,9 @@ def test_fortigate_fortios_sample_audit():
     assert vulns["CVE-2024-21762"]["status"] == STATUS_MITIGATED
 
 
-@pytest.mark.skipif(not PALOALTO_PATH.exists(), reason="Palo Alto config not accessible")
+@pytest.mark.skipif(
+    not PALOALTO_PATH.exists(), reason="Palo Alto config not accessible"
+)
 def test_paloalto_panos_sample_audit():
     with open(PALOALTO_PATH, "r", encoding="utf-8", errors="ignore") as f:
         config_text = f.read()
@@ -181,7 +189,9 @@ def test_paloalto_panos_sample_audit():
     assert vulns["CVE-2024-3400"]["status"] == STATUS_MITIGATED
 
 
-@pytest.mark.skipif(not F5_BIGIP_PATH.exists(), reason="F5 BIG-IP config not accessible")
+@pytest.mark.skipif(
+    not F5_BIGIP_PATH.exists(), reason="F5 BIG-IP config not accessible"
+)
 def test_f5_bigip_sample_audit():
     with open(F5_BIGIP_PATH, "r", encoding="utf-8", errors="ignore") as f:
         config_text = f.read()
@@ -208,7 +218,9 @@ def test_f5_bigip_sample_audit():
     assert vulns["CVE-2023-46747"]["in_kev"] is True
 
 
-@pytest.mark.skipif(not ARBOR_PATH.exists(), reason="Arbor Sightline config not accessible")
+@pytest.mark.skipif(
+    not ARBOR_PATH.exists(), reason="Arbor Sightline config not accessible"
+)
 def test_arbor_sightline_sample_audit():
     with open(ARBOR_PATH, "r", encoding="utf-8", errors="ignore") as f:
         config_text = f.read()

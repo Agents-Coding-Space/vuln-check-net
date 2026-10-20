@@ -78,6 +78,7 @@ def extract_evidence_lines(
 # PRECONDITION EVALUATORS
 # ==============================================================================
 
+
 def check_webvpn(
     features: Dict[str, Any],
     config_text: str = "",
@@ -263,7 +264,9 @@ def check_bgp(
             evidence = "BGP routing is configured and active"
         return PreconditionResult(True, evidence, "")
     else:
-        reason = "Giao thức định tuyến BGP không kích hoạt trong cấu hình (BGP disabled)"
+        reason = (
+            "Giao thức định tuyến BGP không kích hoạt trong cấu hình (BGP disabled)"
+        )
         return PreconditionResult(False, "", reason)
 
 
@@ -290,7 +293,9 @@ def check_ospf(
             evidence = "OSPF routing is configured and active"
         return PreconditionResult(True, evidence, "")
     else:
-        reason = "Giao thức định tuyến OSPF không kích hoạt trong cấu hình (OSPF disabled)"
+        reason = (
+            "Giao thức định tuyến OSPF không kích hoạt trong cấu hình (OSPF disabled)"
+        )
         return PreconditionResult(False, "", reason)
 
 
@@ -344,7 +349,9 @@ def check_smart_install(
             evidence = "Cisco Smart Install (vstack) client is active"
         return PreconditionResult(True, evidence, "")
     else:
-        reason = "Tính năng Cisco Smart Install không kích hoạt trong cấu hình (no vstack)"
+        reason = (
+            "Tính năng Cisco Smart Install không kích hoạt trong cấu hình (no vstack)"
+        )
         return PreconditionResult(False, "", reason)
 
 
@@ -376,7 +383,9 @@ def check_aaa(
 
 
 # Precondition Evaluators Dictionary
-PRECONDITION_EVALUATORS: Dict[str, Callable[[Dict[str, Any], str], PreconditionResult]] = {
+PRECONDITION_EVALUATORS: Dict[
+    str, Callable[[Dict[str, Any], str], PreconditionResult]
+] = {
     "webvpn": check_webvpn,
     "ssl_vpn": check_webvpn,
     "http_server": check_http_server,
@@ -399,7 +408,9 @@ PRECONDITION_EVALUATORS: Dict[str, Callable[[Dict[str, Any], str], PreconditionR
 # ==============================================================================
 
 # Pattern rules mapping CVE descriptions/CWE to specific precondition evaluators
-PATTERN_RULES: List[Tuple[str, str, str, Callable[[Dict[str, Any], str], PreconditionResult]]] = [
+PATTERN_RULES: List[
+    Tuple[str, str, str, Callable[[Dict[str, Any], str], PreconditionResult]]
+] = [
     # (regex_pattern, feature_key, precondition_description, evaluator_func)
     (
         r"\b(webvpn|ssl[- ]vpn|anyconnect|globalprotect|clientless[- ]vpn|openconnect|remote[- ]access[- ]vpn)\b",
@@ -474,6 +485,7 @@ PATTERN_RULES: List[Tuple[str, str, str, Callable[[Dict[str, Any], str], Precond
 # TRIAGE LAYER ENGINE
 # ==============================================================================
 
+
 class TriageLayer:
     """Evaluates vulnerability context and assigns triage status with supporting evidence."""
 
@@ -509,7 +521,9 @@ class TriageLayer:
         # Step 1: Check curated rule registry first (exact CVE ID match)
         rule = self.rule_registry.get(cve_id)
         if rule:
-            precondition_desc = getattr(rule, "precondition_description", "Precondition Rule")
+            precondition_desc = getattr(
+                rule, "precondition_description", "Precondition Rule"
+            )
             mitigation_cmd = getattr(rule, "mitigation_cmd", "")
 
             # If rule has its own precondition checker function
@@ -600,7 +614,10 @@ class TriageLayer:
             "CVE-2022-38753",
         ):
             res = check_http_server(features, config_text)
-            return res.evidence or "HTTP Server / Web UI service is active in configuration"
+            return (
+                res.evidence
+                or "HTTP Server / Web UI service is active in configuration"
+            )
 
         if cve_id_clean in (
             "CVE-2018-0101",

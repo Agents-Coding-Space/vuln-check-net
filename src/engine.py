@@ -6,7 +6,7 @@ and classifies vulnerabilities into EXPLOITABLE, MITIGATED, and POTENTIAL.
 """
 
 import logging
-from typing import Any, Dict, Iterator, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from src.config import (
     OS_ARBOR_ARBOS,
@@ -24,12 +24,6 @@ from src.config import (
     STATUS_EXPLOITABLE,
     STATUS_MITIGATED,
     STATUS_POTENTIAL,
-    VENDOR_CISCO,
-    VENDOR_F5,
-    VENDOR_FORTINET,
-    VENDOR_IMPERVA,
-    VENDOR_NETSCOUT,
-    VENDOR_PALOALTO,
 )
 from src.fetcher_cisa import CisaKevFetcher
 from src.fetcher_nvd import NVDFetcher, PRODUCT_SYNONYMS
@@ -57,25 +51,56 @@ def map_os_to_nvd_vendor_product(vendor: str, os_family: str) -> Tuple[str, str,
     if os_clean == OS_CISCO_ASA.lower() or "asa" in os_clean:
         return "cisco", "adaptive_security_appliance_software", "cisco_asa"
 
-    if os_clean == OS_CISCO_IOS_XE.lower() or "ios xe" in os_clean or "ios_xe" in os_clean:
+    if (
+        os_clean == OS_CISCO_IOS_XE.lower()
+        or "ios xe" in os_clean
+        or "ios_xe" in os_clean
+    ):
         return "cisco", "ios_xe", "ios_xe"
 
-    if os_clean == OS_CISCO_IOS_CLASSIC.lower() or "ios classic" in os_clean or os_clean == "ios":
+    if (
+        os_clean == OS_CISCO_IOS_CLASSIC.lower()
+        or "ios classic" in os_clean
+        or os_clean == "ios"
+    ):
         return "cisco", "ios", "ios"
 
-    if os_clean == OS_FORTINET_FORTIOS.lower() or "fortios" in os_clean or "forti" in os_clean:
+    if (
+        os_clean == OS_FORTINET_FORTIOS.lower()
+        or "fortios" in os_clean
+        or "forti" in os_clean
+    ):
         return "fortinet", "fortios", "fortios"
 
-    if os_clean == OS_PALOALTO_PANOS.lower() or "pan-os" in os_clean or "panos" in os_clean or "palo" in os_clean:
+    if (
+        os_clean == OS_PALOALTO_PANOS.lower()
+        or "pan-os" in os_clean
+        or "panos" in os_clean
+        or "palo" in os_clean
+    ):
         return "palo_alto_networks", "pan-os", "panos"
 
-    if os_clean == OS_F5_BIGIP.lower() or "big-ip" in os_clean or "bigip" in os_clean or "f5" in v_clean:
+    if (
+        os_clean == OS_F5_BIGIP.lower()
+        or "big-ip" in os_clean
+        or "bigip" in os_clean
+        or "f5" in v_clean
+    ):
         return "f5", "big-ip", "semver"
 
-    if os_clean == OS_ARBOR_ARBOS.lower() or "arbor" in os_clean or "arbos" in os_clean or "netscout" in v_clean:
+    if (
+        os_clean == OS_ARBOR_ARBOS.lower()
+        or "arbor" in os_clean
+        or "arbos" in os_clean
+        or "netscout" in v_clean
+    ):
         return "netscout", "arbor_sightline", "semver"
 
-    if os_clean == OS_IMPERVA_SECURESPHERE.lower() or "securesphere" in os_clean or "imperva" in v_clean:
+    if (
+        os_clean == OS_IMPERVA_SECURESPHERE.lower()
+        or "securesphere" in os_clean
+        or "imperva" in v_clean
+    ):
         return "imperva", "securesphere", "semver"
 
     # Generic fallbacks
@@ -129,7 +154,9 @@ class ScanResult(dict):
         hostname = self.device_info.get("hostname", "UNKNOWN")
         total_vulns = len(self.vulnerabilities)
         exp = self.summary.get("exploitable_count", 0)
-        return f"<ScanResult host={hostname} total_vulns={total_vulns} exploitable={exp}>"
+        return (
+            f"<ScanResult host={hostname} total_vulns={total_vulns} exploitable={exp}>"
+        )
 
 
 class CorrelationEngine:
@@ -194,7 +221,9 @@ class CorrelationEngine:
         domain_name = parsed_config.get("domain_name", "")
 
         # Map device to NVD product and version format hint
-        nvd_vendor, nvd_product, os_type = map_os_to_nvd_vendor_product(vendor, os_family)
+        nvd_vendor, nvd_product, os_type = map_os_to_nvd_vendor_product(
+            vendor, os_family
+        )
 
         # 1. Query full CVE set from NVD database
         nvd_cves = self.nvd_fetcher.get_cves_by_product(nvd_vendor, nvd_product)
@@ -285,13 +314,27 @@ class CorrelationEngine:
             precondition_met = triage_res.precondition_met
 
             # Enrich with NVD details and CVSS scores
-            cvss_score = float(cve_item.get("cvss_score") or getattr(rule, "cvss_base", 0.0) or 0.0)
+            cvss_score = float(
+                cve_item.get("cvss_score") or getattr(rule, "cvss_base", 0.0) or 0.0
+            )
             cvss_vector = cve_item.get("cvss_vector") or ""
-            description = cve_item.get("description") or getattr(rule, "description", "")
-            title = getattr(rule, "title", None) or f"{cve_id} - {cve_item.get('product', nvd_product)} Vulnerability"
-            affected_versions = getattr(rule, "affected_version_description", "") or "Identified via NVD CPE Version Range"
-            references = getattr(rule, "references", None) or [f"https://nvd.nist.gov/vuln/detail/{cve_id}"]
-            mitigation_cmd = getattr(rule, "mitigation_cmd", "") or triage_res.mitigation_cmd
+            description = cve_item.get("description") or getattr(
+                rule, "description", ""
+            )
+            title = (
+                getattr(rule, "title", None)
+                or f"{cve_id} - {cve_item.get('product', nvd_product)} Vulnerability"
+            )
+            affected_versions = (
+                getattr(rule, "affected_version_description", "")
+                or "Identified via NVD CPE Version Range"
+            )
+            references = getattr(rule, "references", None) or [
+                f"https://nvd.nist.gov/vuln/detail/{cve_id}"
+            ]
+            mitigation_cmd = (
+                getattr(rule, "mitigation_cmd", "") or triage_res.mitigation_cmd
+            )
 
             # Enrich with CISA KEV data
             in_kev, kev_record = self.cisa_fetcher.is_in_kev(cve_id)
@@ -359,7 +402,8 @@ class CorrelationEngine:
             vuln_entry = {
                 "cve_id": cve_id,
                 "title": title,
-                "vendor": getattr(rule, "vendor", None) or cve_item.get("vendor", vendor),
+                "vendor": getattr(rule, "vendor", None)
+                or cve_item.get("vendor", vendor),
                 "product": cve_item.get("product", nvd_product),
                 "os_family": os_family,
                 "status": status,
@@ -437,7 +481,9 @@ class CorrelationEngine:
         Queries the full NVD product database, identifies affected CVEs,
         and marks them as POTENTIAL (Affected by Version).
         """
-        nvd_vendor, nvd_product, os_type = map_os_to_nvd_vendor_product(vendor, os_family)
+        nvd_vendor, nvd_product, os_type = map_os_to_nvd_vendor_product(
+            vendor, os_family
+        )
 
         nvd_cves = self.nvd_fetcher.get_cves_by_product(nvd_vendor, nvd_product)
         cve_candidates: Dict[str, Dict[str, Any]] = {
@@ -494,14 +540,28 @@ class CorrelationEngine:
             if not version_affected:
                 continue
 
-            cvss_score = float(cve_item.get("cvss_score") or getattr(rule, "cvss_base", 0.0) or 0.0)
+            cvss_score = float(
+                cve_item.get("cvss_score") or getattr(rule, "cvss_base", 0.0) or 0.0
+            )
             in_kev, _ = self.cisa_fetcher.is_in_kev(cve_id)
-            if not in_kev and (cve_item.get("in_cisa_kev") or getattr(rule, "in_kev", False)):
+            if not in_kev and (
+                cve_item.get("in_cisa_kev") or getattr(rule, "in_kev", False)
+            ):
                 in_kev = True
 
-            title = getattr(rule, "title", None) or f"{cve_id} - {cve_item.get('product', nvd_product)} Vulnerability"
-            affected_versions = getattr(rule, "affected_version_description", "") or "Identified via NVD CPE Range"
-            pre_desc = getattr(rule, "precondition_description", "Requires running configuration for triage evaluation")
+            title = (
+                getattr(rule, "title", None)
+                or f"{cve_id} - {cve_item.get('product', nvd_product)} Vulnerability"
+            )
+            affected_versions = (
+                getattr(rule, "affected_version_description", "")
+                or "Identified via NVD CPE Range"
+            )
+            pre_desc = getattr(
+                rule,
+                "precondition_description",
+                "Requires running configuration for triage evaluation",
+            )
             mit_cmd = getattr(rule, "mitigation_cmd", "# Review device configuration")
             desc = cve_item.get("description") or getattr(rule, "description", "")
 
@@ -536,9 +596,7 @@ class CorrelationEngine:
             return False
         return rule_os.strip().lower() == device_os.strip().lower()
 
-    def _calculate_real_risk(
-        self, status: str, cvss_score: float, in_kev: bool
-    ) -> str:
+    def _calculate_real_risk(self, status: str, cvss_score: float, in_kev: bool) -> str:
         """Compute real operational risk based on triage condition, CVSS score, and KEV."""
         if status == STATUS_MITIGATED:
             # When vulnerable feature is disabled, direct exploitation is prevented
