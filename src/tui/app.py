@@ -40,6 +40,7 @@ from src.config import (
     RISK_MEDIUM,
     STATUS_EXPLOITABLE,
     STATUS_MITIGATED,
+    STATUS_POTENTIAL,
     VENDOR_CISCO,
     VENDOR_F5,
     VENDOR_FORTINET,
@@ -353,6 +354,12 @@ Markdown {
     margin-right: 1;
     min-width: 9;
 }
+
+.btn-filter-active {
+    background: #0284c7 !important;
+    color: #ffffff !important;
+    text-style: bold;
+}
 """
 
 
@@ -458,6 +465,10 @@ class VulnCheckApp(App):
         Binding("ctrl+l", "tab_lookup", "Version Lookup", show=True, priority=True),
         Binding("ctrl+k", "tab_kev", "KEV Explorer", show=True, priority=True),
         Binding("ctrl+e", "export_all", "Export", show=True, priority=True),
+        Binding("f1", "filter_triage_all", "F1: All", show=True),
+        Binding("f2", "filter_triage_exploitable", "F2: Exploitable", show=True),
+        Binding("f3", "filter_triage_kev", "F3: KEV", show=True),
+        Binding("f4", "filter_triage_mitigated", "F4: Mitigated", show=True),
         Binding("v", "view_fullscreen", "Full Details [V]", show=True),
         Binding("alt+down", "scroll_detail_down", "Scroll Detail ↓", show=True),
         Binding("alt+up", "scroll_detail_up", "Scroll Detail ↑", show=True),
@@ -468,6 +479,7 @@ class VulnCheckApp(App):
     def __init__(self, initial_file: Optional[str] = None) -> None:
         super().__init__()
         self.initial_file = initial_file
+        self.current_triage_filter: str = "all"
         self.current_audit_result: Optional[Dict[str, Any]] = None
         self.audit_vulns_map: Dict[str, Dict[str, Any]] = {}
         self.lookup_vulns_map: Dict[str, Dict[str, Any]] = {}
@@ -539,6 +551,15 @@ class VulnCheckApp(App):
                             id="metric-crithigh",
                             classes="metric-card",
                         )
+
+                # Triage Filter Bar
+                with Horizontal(id="audit-filter-bar", classes="filter-bar"):
+                    yield Label("Triage Filter:")
+                    yield Button("All [F1]", id="btn-triage-all", classes="btn-filter btn-filter-active")
+                    yield Button("Exploitable [F2]", id="btn-triage-exploitable", classes="btn-filter")
+                    yield Button("CISA KEV [F3]", id="btn-triage-kev", classes="btn-filter")
+                    yield Button("Mitigated [F4]", id="btn-triage-mitigated", classes="btn-filter")
+                    yield Button("Potential", id="btn-triage-potential", classes="btn-filter")
 
                 # DataTable for audit findings
                 yield DataTable(id="audit-datatable")
@@ -659,11 +680,11 @@ class VulnCheckApp(App):
         table_audit.cursor_type = "row"
         table_audit.add_column("CVE ID", key="cve")
         table_audit.add_column("Title", key="title")
-        table_audit.add_column("Status", key="status")
+        table_audit.add_column("Triage Status", key="status")
         table_audit.add_column("Real Risk", key="risk")
         table_audit.add_column("CVSS", key="cvss")
-        table_audit.add_column("In KEV", key="kev")
-        table_audit.add_column("Precondition", key="precond")
+        table_audit.add_column("CISA KEV", key="kev")
+        table_audit.add_column("Precondition Requirement / Evidence", key="precond")
 
         # Setup Tab 2 DataTable
         table_lookup = self.query_one("#table-lookup-vulns", DataTable)
@@ -701,6 +722,56 @@ class VulnCheckApp(App):
     def action_tab_audit(self) -> None:
         """Switch to Device Audit tab."""
         self.query_one("#main-tabs", TabbedContent).active = "tab-audit"
+
+    def action_filter_triage_all(self) -> None:
+        """Filter audit table to show all findings (F1)."""
+        self.set_triage_filter("all")
+
+    def action_filter_triage_exploitable(self) -> None:
+        """Filter audit table to show only EXPLOITABLE findings (F2)."""
+        self.set_triage_filter("exploitable")
+
+    def action_filter_triage_kev(self) -> None:
+        """Filter audit table to show only CISA KEV findings (F3)."""
+        self.set_triage_filter("kev")
+
+    def action_filter_triage_mitigated(self) -> None:
+        """Filter audit table to show only MITIGATED findings (F4)."""
+        self.set_triage_filter("mitigated")
+
+    def set_triage_filter(self, filter_name: str) -> None:
+        """Apply a triage filter and refresh findings table."""
+        self.current_triage_filter = filter_name.lower()
+        self._update_filter_button_styles()
+        self._refresh_audit_table()
+        filter_names = {
+            "all": "All Vulnerabilities (F1)",
+            "exploitable": "EXPLOITABLE Only (F2)",
+            "kev": "CISA KEV Only (F3)",
+            "mitigated": "MITIGATED Only (F4)",
+            "potential": "POTENTIAL Only",
+        }
+        lbl = filter_names.get(self.current_triage_filter, self.current_triage_filter)
+        self.notify(f"Filter: {lbl}", title="Triage Filter", timeout=2)
+
+    def _update_filter_button_styles(self) -> None:
+        """Update active button styling in audit filter bar."""
+        mapping = {
+            "all": "#btn-triage-all",
+            "exploitable": "#btn-triage-exploitable",
+            "kev": "#btn-triage-kev",
+            "mitigated": "#btn-triage-mitigated",
+            "potential": "#btn-triage-potential",
+        }
+        for key, btn_id in mapping.items():
+            try:
+                btn = self.query_one(btn_id, Button)
+                if key == self.current_triage_filter:
+                    btn.add_class("btn-filter-active")
+                else:
+                    btn.remove_class("btn-filter-active")
+            except Exception:
+                pass
 
     def action_tab_lookup(self) -> None:
         """Switch to Version Lookup tab."""
@@ -767,7 +838,8 @@ class VulnCheckApp(App):
                     row_key = table.coordinate_to_cell_key((table.cursor_row, 0)).row_key.value
                     if row_key and str(row_key) in self.audit_vulns_map:
                         v = self.audit_vulns_map[str(row_key)]
-                        title = f"{v.get('cve_id', 'Vulnerability')} — {v.get('title', '')}"
+                        st = (v.get("status") or v.get("triage_status", "")).strip().upper()
+                        title = f"[{st}] {v.get('cve_id', 'Vulnerability')} — {v.get('title', '')}"
             except Exception:
                 pass
             try:
@@ -884,6 +956,18 @@ class VulnCheckApp(App):
                 )
                 return
             self.scan_file_path(path)
+
+        # 2a. Triage Filter buttons
+        elif bid == "btn-triage-all":
+            self.set_triage_filter("all")
+        elif bid == "btn-triage-exploitable":
+            self.set_triage_filter("exploitable")
+        elif bid == "btn-triage-kev":
+            self.set_triage_filter("kev")
+        elif bid == "btn-triage-mitigated":
+            self.set_triage_filter("mitigated")
+        elif bid == "btn-triage-potential":
+            self.set_triage_filter("potential")
 
         # 2b. Detail Header buttons (fullscreen & scrolling)
         elif bid in ("btn-vuln-fullscreen", "btn-lookup-fullscreen", "btn-kev-fullscreen"):
@@ -1052,20 +1136,36 @@ class VulnCheckApp(App):
         # 2. Update Metrics Summary Counters
         self._update_metrics(summary)
 
-        # 3. Populate Findings DataTable
+        # 3. Populate Findings DataTable via current filter
+        self.current_triage_filter = "all"
+        self._update_filter_button_styles()
+        self._refresh_audit_table()
+
+        hostname = dev_info.get("hostname", "Device")
+        exp_cnt = summary.get("exploitable_count", 0)
+        self.notify(
+            f"Audit finished for {hostname}: {len(vulns)} CVE rules matched ({exp_cnt} EXPLOITABLE).",
+            title="Scan Complete",
+            severity="information" if exp_cnt == 0 else "warning",
+        )
+
+    def _populate_audit_table(self, vulns: List[Dict[str, Any]]) -> None:
+        """Populate the audit DataTable with vulnerabilities."""
         table = self.query_one("#audit-datatable", DataTable)
         table.clear()
 
         for v in vulns:
             cve_id = v.get("cve_id", "")
             title = v.get("title", "")
-            st = v.get("status", "")
+            st = (v.get("status") or v.get("triage_status", "")).strip().upper()
             if st == STATUS_EXPLOITABLE:
-                st_txt = Text(" EXPLOITABLE ", style="bold white on #b91c1c")
+                st_txt = Text("[EXPLOITABLE]", style="bold white on #b91c1c")
             elif st == STATUS_MITIGATED:
-                st_txt = Text(" MITIGATED ", style="bold white on #059669")
+                st_txt = Text("[MITIGATED]", style="bold white on #059669")
+            elif st == STATUS_POTENTIAL:
+                st_txt = Text("[POTENTIAL]", style="bold black on #eab308")
             else:
-                st_txt = Text(f" {st} ", style="bold white on #475569")
+                st_txt = Text(f"[{st}]", style="bold white on #475569")
 
             risk = v.get("real_risk", "")
             if risk == RISK_CRITICAL:
@@ -1079,11 +1179,11 @@ class VulnCheckApp(App):
 
             score_txt = str(v.get("base_score", ""))
             kev_txt = (
-                Text("YES", style="bold red")
+                Text("[!] KEV", style="bold red")
                 if v.get("in_kev")
-                else Text("NO", style="dim")
+                else Text("No", style="dim")
             )
-            precond_txt = v.get("precondition_description", "")
+            precond_txt = v.get("feature_evidence") or v.get("precondition_description", "")
 
             table.add_row(
                 cve_id,
@@ -1096,24 +1196,37 @@ class VulnCheckApp(App):
                 key=cve_id,
             )
 
-        # 4. Update Detail Panel
+    def _refresh_audit_table(self) -> None:
+        """Re-filter and refresh the audit findings table."""
+        if not self.current_audit_result:
+            return
+
+        all_vulns = self.current_audit_result.get("vulnerabilities", [])
+        dev_info = self.current_audit_result.get("device_info", {})
+
+        filtered = self.reporter.filter_vulnerabilities(
+            all_vulns,
+            filter_triage=self.current_triage_filter if self.current_triage_filter != "kev" else "all",
+            kev_only=(self.current_triage_filter == "kev"),
+        )
+
+        self._populate_audit_table(filtered)
+
         detail_panel = self.query_one("#detail-content", Markdown)
-        if vulns:
+        table = self.query_one("#audit-datatable", DataTable)
+        if filtered:
             table.move_cursor(row=0)
-            detail_panel.update(self._render_vuln_detail(vulns[0], dev_info))
+            detail_panel.update(self._render_vuln_detail(filtered[0], dev_info))
             self.query_one("#vuln-detail-container", VerticalScroll).scroll_to(y=0, animate=False)
         else:
-            detail_panel.update(
-                "*No vulnerabilities matched this device OS version and configuration.*"
-            )
-
-        hostname = dev_info.get("hostname", "Device")
-        exp_cnt = summary.get("exploitable_count", 0)
-        self.notify(
-            f"Audit finished for {hostname}: {len(vulns)} CVE rules matched ({exp_cnt} EXPLOITABLE).",
-            title="Scan Complete",
-            severity="information" if exp_cnt == 0 else "warning",
-        )
+            if not all_vulns:
+                detail_panel.update(
+                    "*No vulnerabilities matched this device OS version and configuration.*"
+                )
+            else:
+                detail_panel.update(
+                    f"*No findings matched filter '{self.current_triage_filter.upper()}'. Total findings: {len(all_vulns)}.*"
+                )
 
     def _render_metadata_card(self, info: Dict[str, Any]) -> str:
         """Render device metadata card with rich syntax."""
@@ -1191,6 +1304,8 @@ class VulnCheckApp(App):
         kev_details = vuln.get("kev_details", {})
         precond_desc = vuln.get("precondition_description", "N/A")
         precond_met = vuln.get("precondition_met", False)
+        feature_evidence = vuln.get("feature_evidence") or "No direct configuration evidence pattern matched."
+        mitigation_reason = vuln.get("mitigation_reason") or "No specific mitigation reason recorded."
         mit_cmd = vuln.get("mitigation_cmd", "N/A")
         affected_ver = vuln.get("affected_versions", "N/A")
         vendor = vuln.get("vendor") or dev_info.get("vendor", "N/A")
@@ -1199,12 +1314,12 @@ class VulnCheckApp(App):
         refs = vuln.get("references", [])
         dev_ver = dev_info.get("version", "N/A")
 
-        status_badge = f"`{status}`"
+        status_badge = f"`[{status}]`"
         risk_badge = f"`{real_risk}`"
         kev_badge = "In CISA KEV" if in_kev else "Not in KEV"
         kev_header_badge = f"`{kev_badge}`" if in_kev else f"*{kev_badge}*"
         precond_status = (
-            "**Active in running-config (VULNERABLE)**"
+            "**Active in running-config (VULNERABLE / EXPLOITABLE)**"
             if precond_met
             else "**Disabled or Absent (ATTACK SURFACE NEUTRALIZED)**"
         )
@@ -1217,17 +1332,30 @@ class VulnCheckApp(App):
             "| Thuộc tính | Chi tiết |",
             "| :--- | :--- |",
             f"| **Trạng thái** | `{status}` |",
+            f"| **Triage Status** | `[{status}]` |",
             f"| **Mức độ Rủi ro** | `{real_risk}` |",
             f"| **Điểm CVSS v3.1** | `{cvss}` |",
             f"| **CISA KEV** | `{kev_badge}` |",
+            f"| **Lý do Triage** | {mitigation_reason} |",
+            f"| **Bằng chứng Cấu hình** | `{feature_evidence}` |",
             f"| **Hãng & OS** | `{vendor} ({os_fam})` |",
             f"| **Dải ảnh hưởng** | `{affected_ver}` |",
             "",
             "---",
             "",
+            "### Triage Assessment & Configuration Evidence",
+            f"- **Triage Status:** `[{status}]`",
+            f"- **Triage Reason:** {mitigation_reason}",
+            f"- **Configuration Evidence (`feature_evidence`):** `{feature_evidence}`",
+            f"- **Precondition Evaluated:** {precond_desc}",
+            f"- **Precondition Met:** `{'YES' if precond_met else 'NO'}`",
+            f"- **Config Audit State:** {precond_status}",
+            "",
             "### Precondition Requirement & Audit Evidence",
             f"- **Condition Required:** {precond_desc}",
             f"- **Config Audit State:** {precond_status}",
+            f"- **Feature Evidence:** `{feature_evidence}`",
+            f"- **Triage Reason:** {mitigation_reason}",
             "",
             "### Affected OS Version Range",
             f"- **Affected Range:** `{affected_ver}`",

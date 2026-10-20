@@ -47,112 +47,26 @@ def render_banner() -> None:
     """Display CLI banner."""
     banner = (
         "[bold cyan]Vuln-Check-Net[/bold cyan] : [bold white]Multi-Vendor Network CVE Audit Engine[/bold white]\n"
-        "[dim]Two-Condition Correlation (Version Range + Active Preconditions) | CISA KEV & NVD Intelligence[/dim]"
+        "[dim]Two-Condition Correlation (Version Range + Active Preconditions) | CISA KEV & NVD Intelligence[/dim]\n"
+        "[bold green]Authoritative Data Source: NIST NVD API 2.0 (Local SQLite Cache) + CISA KEV Feed[/bold green]"
     )
     console.print(Panel(banner, border_style="cyan", padding=(0, 2)))
 
 
-def print_device_audit(result: dict) -> None:
+def print_device_audit(
+    result: dict,
+    filter_triage: str = "all",
+    kev_only: bool = False,
+    out_console: Console = console,
+) -> None:
     """Print terminal summary and vulnerability findings for a device."""
-    info = result.get("device_info", {})
-    summary = result.get("summary", {})
-    vulns = result.get("vulnerabilities", [])
-
-    # Device Metadata Table
-    dev_table = Table(
-        title=f"Device Audit: [bold yellow]{info.get('hostname')}[/bold yellow]",
-        box=box.ROUNDED,
-        header_style="bold cyan",
+    reporter = Reporter()
+    reporter.print_device_audit(
+        result,
+        filter_triage=filter_triage,
+        kev_only=kev_only,
+        console=out_console,
     )
-    dev_table.add_column("Property", style="bold white", width=18)
-    dev_table.add_column("Value", style="cyan")
-
-    dev_table.add_row("Hostname", info.get("hostname", "UNKNOWN"))
-    dev_table.add_row("Domain Name", info.get("domain_name") or "N/A")
-    dev_table.add_row("Vendor", info.get("vendor", "Unknown"))
-    dev_table.add_row("OS Family", info.get("os_family", "Unknown"))
-    dev_table.add_row("OS Version", f"[bold green]{info.get('version', 'N/A')}[/bold green]")
-    dev_table.add_row("Hardware Model", info.get("model", "Unknown"))
-
-    features = info.get("features", {})
-    active_feats = [k for k, v in features.items() if v]
-    inactive_feats = [k for k, v in features.items() if not v]
-    dev_table.add_row(
-        "Active Features",
-        ", ".join(f"[red]{f}[/red]" for f in active_feats) if active_feats else "[dim]None[/dim]",
-    )
-    dev_table.add_row(
-        "Inactive Features",
-        ", ".join(f"[dim green]{f}[/dim green]" for f in inactive_feats) if inactive_feats else "[dim]None[/dim]",
-    )
-    console.print(dev_table)
-
-    # Executive Summary Counters
-    exp_cnt = summary.get("exploitable_count", 0)
-    mit_cnt = summary.get("mitigated_count", 0)
-    pot_cnt = summary.get("potential_count", 0)
-    kev_cnt = summary.get("in_kev_count", 0)
-    crit_cnt = summary.get("critical_count", 0)
-    high_cnt = summary.get("high_count", 0)
-
-    summary_text = (
-        f"[bold]Total Checked:[/bold] {summary.get('total_cves_checked', summary.get('total_rules_evaluated', 0))} | "
-        f"[bold]Version Matched:[/bold] {summary.get('total_affected_versions', 0)} | "
-        f"[bold red]EXPLOITABLE:[/bold red] {exp_cnt} | "
-        f"[bold yellow]POTENTIAL:[/bold yellow] {pot_cnt} | "
-        f"[bold green]MITIGATED:[/bold green] {mit_cnt} | "
-        f"[bold magenta]CISA KEV:[/bold magenta] {kev_cnt} | "
-        f"[bold red]CRITICAL:[/bold red] {crit_cnt} | "
-        f"[bold yellow]HIGH:[/bold yellow] {high_cnt}"
-    )
-    border_col = "red" if exp_cnt > 0 else "green"
-    console.print(Panel(summary_text, title="Audit Metrics", border_style=border_col))
-
-    # Vulnerability Table
-    if not vulns:
-        console.print("[green]✔ No matching vulnerabilities found for this device OS version.[/green]\n")
-        return
-
-    v_table = Table(box=box.SIMPLE_HEAVY, header_style="bold magenta")
-    v_table.add_column("CVE ID", style="bold white", width=16)
-    v_table.add_column("Title", width=34)
-    v_table.add_column("Status", width=13, justify="center")
-    v_table.add_column("Real Risk", width=11, justify="center")
-    v_table.add_column("CVSS", width=6, justify="center")
-    v_table.add_column("KEV", width=9, justify="center")
-    v_table.add_column("Precondition Requirement", width=38)
-
-    for v in vulns:
-        st = v.get("status", "")
-        if st == STATUS_EXPLOITABLE:
-            st_text = "[bold white on red] EXPLOITABLE [/]"
-        elif st == STATUS_MITIGATED:
-            st_text = "[bold white on green] MITIGATED [/]"
-        else:
-            st_text = "[bold white on yellow] POTENTIAL [/]"
-
-        risk = v.get("real_risk", "")
-        if risk == RISK_CRITICAL:
-            risk_text = "[bold red]CRITICAL[/]"
-        elif risk == RISK_HIGH:
-            risk_text = "[bold yellow]HIGH[/]"
-        else:
-            risk_text = f"[green]{risk}[/green]"
-
-        kev_text = "[bold red]YES[/]" if v.get("in_kev") else "[dim]NO[/dim]"
-
-        v_table.add_row(
-            v.get("cve_id"),
-            v.get("title")[:32] + "..." if len(v.get("title", "")) > 32 else v.get("title", ""),
-            st_text,
-            risk_text,
-            str(v.get("base_score", "")),
-            kev_text,
-            v.get("precondition_description", ""),
-        )
-
-    console.print(v_table)
-    console.print("")
 
 
 def handle_scan(args: argparse.Namespace) -> None:
@@ -195,7 +109,12 @@ def handle_scan(args: argparse.Namespace) -> None:
                 console.print(f"[red]Error parsing {f.name}: {e}[/red]")
 
     for r in all_results:
-        print_device_audit(r)
+        reporter.print_device_audit(
+            r,
+            filter_triage=getattr(args, "triage", "all"),
+            kev_only=getattr(args, "kev_only", False),
+            console=console,
+        )
 
     # Export reports if requested
     if args.out_md:
@@ -247,10 +166,17 @@ def handle_lookup(args: argparse.Namespace) -> None:
     engine = CorrelationEngine()
     results = engine.evaluate_version_only(vendor=vendor, os_family=os_family, version=version)
 
+    if getattr(args, "kev_only", False):
+        results = [r for r in results if r.get("in_kev")]
+    if getattr(args, "triage", "all") != "all":
+        target = args.triage.strip().lower()
+        results = [r for r in results if (r.get("status") or r.get("triage_status", "")).strip().lower() == target]
+
     console.print(
         Panel(
             f"[bold]Vendor:[/bold] {vendor} | [bold]OS Family:[/bold] {os_family} | [bold]Version:[/bold] [yellow]{version}[/yellow]\n"
-            f"[dim]Potential vulnerabilities based on version range. Run a full config scan to verify preconditions.[/dim]",
+            f"[dim]Potential vulnerabilities based on version range. Run a full config scan to verify preconditions.[/dim]\n"
+            f"[bold green]Authoritative Data Source: NIST NVD API 2.0 (Local SQLite Cache) + CISA KEV Feed[/bold green]",
             title="Version Vulnerability Lookup",
             border_style="cyan",
         )
@@ -316,6 +242,20 @@ def main() -> None:
     p_scan = subparsers.add_parser("scan", help="Scan network device configuration file or directory")
     p_scan.add_argument("--file", "-f", help="Path to single configuration file")
     p_scan.add_argument("--dir", "-d", help="Path to directory containing configuration files")
+    p_scan.add_argument(
+        "--triage",
+        "--filter-triage",
+        dest="triage",
+        choices=["all", "exploitable", "mitigated", "potential"],
+        default="all",
+        help="Filter findings by triage status (all, exploitable, mitigated, potential)",
+    )
+    p_scan.add_argument(
+        "--kev-only",
+        action="store_true",
+        default=False,
+        help="Filter findings to only CISA KEV cataloged vulnerabilities",
+    )
     p_scan.add_argument("--out-md", help="Path to export Markdown report (.md)")
     p_scan.add_argument("--out-xlsx", help="Path to export Excel workbook (.xlsx)")
     p_scan.add_argument("--out-json", help="Path to export JSON output (.json)")
@@ -325,6 +265,20 @@ def main() -> None:
     p_lookup.add_argument("--vendor", "-v", required=True, help="Vendor (e.g. Cisco, Fortinet, Palo Alto)")
     p_lookup.add_argument("--version", "-ver", required=True, help="OS version string (e.g. 9.20(3), 17.3.1, 7.2.4)")
     p_lookup.add_argument("--os", help="Specific OS family (e.g. 'Cisco ASA', 'Cisco IOS XE')")
+    p_lookup.add_argument(
+        "--triage",
+        "--filter-triage",
+        dest="triage",
+        choices=["all", "exploitable", "mitigated", "potential"],
+        default="all",
+        help="Filter findings by triage status (all, exploitable, mitigated, potential)",
+    )
+    p_lookup.add_argument(
+        "--kev-only",
+        action="store_true",
+        default=False,
+        help="Filter findings to only CISA KEV cataloged vulnerabilities",
+    )
 
     # update-kev subcommand
     subparsers.add_parser("update-kev", help="Fetch latest CISA Known Exploited Vulnerabilities catalog")

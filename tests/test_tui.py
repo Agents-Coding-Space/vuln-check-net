@@ -557,3 +557,84 @@ async def test_tui_fullscreen_modal(tmp_path):
         assert not isinstance(pilot.app.screen, VulnerabilityDetailModal)
 
 
+@pytest.mark.asyncio
+async def test_tui_triage_filters_f1_to_f4(tmp_path):
+    """Verify triage shortcuts F1, F2, F3, F4 filter findings dynamically."""
+    asa_file = tmp_path / "test_filter_asa.txt"
+    asa_file.write_text(SAMPLE_ASA_CONFIG.strip(), encoding="utf-8")
+
+    app = VulnCheckApp()
+    async with app.run_test() as pilot:
+        inp = pilot.app.query_one("#input-config-path", Input)
+        inp.value = str(asa_file)
+        pilot.app.query_one("#btn-scan", Button).press()
+        await pilot.pause()
+
+        audit_table = pilot.app.query_one("#audit-datatable", DataTable)
+        initial_count = audit_table.row_count
+        assert initial_count > 0
+
+        # 1. Filter F2 (Exploitable only)
+        pilot.app.action_filter_triage_exploitable()
+        await pilot.pause()
+        assert pilot.app.current_triage_filter == "exploitable"
+        assert 0 < audit_table.row_count <= initial_count
+
+        # 2. Filter F3 (KEV only)
+        pilot.app.action_filter_triage_kev()
+        await pilot.pause()
+        assert pilot.app.current_triage_filter == "kev"
+
+        # 3. Filter F4 (Mitigated only)
+        pilot.app.action_filter_triage_mitigated()
+        await pilot.pause()
+        assert pilot.app.current_triage_filter == "mitigated"
+
+        # 4. Filter F1 (Restore All)
+        pilot.app.action_filter_triage_all()
+        await pilot.pause()
+        assert pilot.app.current_triage_filter == "all"
+        assert audit_table.row_count == initial_count
+
+
+@pytest.mark.asyncio
+async def test_tui_triage_filter_buttons_and_modal_evidence(tmp_path):
+    """Verify filter buttons and modal display of feature_evidence and triage reason."""
+    asa_file = tmp_path / "test_buttons_asa.txt"
+    asa_file.write_text(SAMPLE_ASA_CONFIG.strip(), encoding="utf-8")
+
+    app = VulnCheckApp()
+    async with app.run_test() as pilot:
+        inp = pilot.app.query_one("#input-config-path", Input)
+        inp.value = str(asa_file)
+        pilot.app.query_one("#btn-scan", Button).press()
+        await pilot.pause()
+
+        # 1. Click Exploitable button
+        btn_exp = pilot.app.query_one("#btn-triage-exploitable", Button)
+        btn_exp.press()
+        await pilot.pause()
+        assert pilot.app.current_triage_filter == "exploitable"
+        assert "btn-filter-active" in btn_exp.classes
+
+        # 2. Open Full Details Modal and verify feature_evidence
+        pilot.app.action_view_fullscreen()
+        await pilot.pause()
+        assert len(pilot.app.screen_stack) == 2
+
+        modal = pilot.app.screen
+        assert isinstance(modal, VulnerabilityDetailModal)
+        modal_md = modal.query_one("#modal-markdown", Markdown).source
+
+        assert "Triage Status" in modal_md
+        assert "feature_evidence" in modal_md or "Bằng chứng Cấu hình" in modal_md
+        assert "Triage Reason" in modal_md or "Lý do Triage" in modal_md
+        assert "[EXPLOITABLE]" in modal_md or "EXPLOITABLE" in modal_md
+
+        # Close modal
+        await pilot.press("escape")
+        await pilot.pause()
+        assert len(pilot.app.screen_stack) == 1
+
+
+
