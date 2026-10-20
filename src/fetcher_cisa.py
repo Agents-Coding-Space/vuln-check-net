@@ -8,6 +8,7 @@ import json
 import logging
 import subprocess
 import urllib.request
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -516,6 +517,112 @@ class CisaKevFetcher:
             logger.error("Failed to write CISA KEV cache to %s: %s", self.cache_file, e)
             return False
 
+    def sync_incremental(self, force: bool = False) -> Dict[str, Any]:
+        """Perform an incremental or conditional HTTP check for CISA KEV updates.
+
+        Args:
+            force: Force full redownload even if ETag matches.
+
+        Returns:
+            Dictionary with keys: status, added_count, total_count, last_sync.
+        """
+        from src.fetcher_nvd import NVDDatabase
+
+        db = NVDDatabase()
+        meta = db.get_sync_metadata("cisa_kev") or {}
+        last_etag = meta.get("etag") if not force else None
+
+        headers = {
+            "User-Agent": "curl/8.16.0",
+            "Accept": "application/json, text/plain, */*",
+        }
+        if last_etag:
+            headers["If-None-Match"] = last_etag
+
+        # Check HTTP status
+        try:
+            resp = requests.get(CISA_KEV_URL, headers=headers, timeout=HTTP_TIMEOUT)
+            if resp.status_code == 304:
+                logger.info("CISA KEV feed is up-to-date (HTTP 304 Not Modified).")
+                now_str = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.000Z")
+                db.set_sync_metadata(
+                    source="cisa_kev",
+                    last_sync_timestamp=now_str,
+                    status="up_to_date",
+                    etag=last_etag,
+                    record_count=len(self._cve_map),
+                    details="HTTP 304 Not Modified",
+                )
+                return {
+                    "status": "up_to_date",
+                    "added_count": 0,
+                    "total_count": len(self._cve_map),
+                    "last_sync": now_str,
+                }
+            elif resp.status_code == 200:
+                raw_json = resp.json()
+                new_etag = resp.headers.get("ETag")
+                initial_count = len(self._cve_map)
+
+                # Merge vulnerabilities
+                downloaded_vulns = raw_json.get("vulnerabilities", [])
+                merged_map: Dict[str, Dict[str, Any]] = {}
+                for v in PRESET_KEV_ENTRIES:
+                    cid = str(v.get("cveID", "")).strip().upper()
+                    if cid:
+                        merged_map[cid] = v
+
+                for v in downloaded_vulns:
+                    cid = str(v.get("cveID", "")).strip().upper()
+                    if cid:
+                        merged_map[cid] = v
+
+                payload = {
+                    "title": "CISA Known Exploited Vulnerabilities Catalog",
+                    "catalogVersion": raw_json.get("catalogVersion", "1.0"),
+                    "dateReleased": raw_json.get(
+                        "dateReleased",
+                        datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+                    ),
+                    "count": len(merged_map),
+                    "vulnerabilities": list(merged_map.values()),
+                }
+
+                self.cache_file.parent.mkdir(parents=True, exist_ok=True)
+                with open(self.cache_file, "w", encoding="utf-8") as f:
+                    json.dump(payload, f, indent=2)
+
+                self._load_cache()
+                added_count = max(0, len(self._cve_map) - initial_count)
+                now_str = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.000Z")
+
+                db.set_sync_metadata(
+                    source="cisa_kev",
+                    last_sync_timestamp=now_str,
+                    status="success",
+                    etag=new_etag,
+                    record_count=len(self._cve_map),
+                    details=f"Updated catalog with {added_count} new CVEs.",
+                )
+
+                return {
+                    "status": "updated",
+                    "added_count": added_count,
+                    "total_count": len(self._cve_map),
+                    "last_sync": now_str,
+                }
+        except Exception as e:
+            logger.warning("Error during incremental CISA KEV sync: %s", e)
+
+        # Fallback to local cache status
+        now_str = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.000Z")
+        return {
+            "status": "cached",
+            "added_count": 0,
+            "total_count": len(self._cve_map),
+            "last_sync": now_str,
+        }
+
     def _download_kev_feed(self) -> Optional[Dict[str, Any]]:
         """Download raw JSON feed using resilient transport fallback."""
         headers = {
@@ -599,3 +706,8 @@ def is_in_kev(cve_id: str) -> KevMatch:
 def get_kev_details(cve_id: str) -> Optional[Dict[str, Any]]:
     """Convenience function: Retrieve KEV details for a CVE ID."""
     return get_cisa_fetcher().get_kev_details(cve_id)
+
+
+def sync_cisa_kev(force: bool = False) -> Dict[str, Any]:
+    """Convenience function: Incremental or conditional update of CISA KEV catalog."""
+    return get_cisa_fetcher().sync_incremental(force=force)

@@ -80,3 +80,12 @@ RISK_HIGH = "HIGH"
 RISK_MEDIUM = "MEDIUM"
 RISK_LOW = "LOW"
 RISK_INFO = "INFO"
+
+# Database Sync & Day-by-Day Freshness Settings
+AUTO_UPDATE_ON_STARTUP = os.environ.get("VULN_CHECK_AUTO_UPDATE", "1") in (
+    "1",
+    "true",
+    "True",
+)
+CACHE_EXPIRY_HOURS = int(os.environ.get("VULN_CHECK_CACHE_EXPIRY_HOURS", "24"))
+INCREMENTAL_DAYS_DEFAULT = int(os.environ.get("VULN_CHECK_SYNC_DAYS", "7"))

@@ -762,6 +762,28 @@ class VulnCheckApp(App):
                         classes="detail-panel",
                     )
 
+            # TAB 4: Database Health & Synchronization
+            with TabPane("Database & Sync", id="tab-db"):
+                with Horizontal(id="db-controls-bar", classes="lookup-bar"):
+                    yield Button("Check Status", id="btn-db-status", variant="primary")
+                    yield Button(
+                        "Update Now (Sync)", id="btn-db-sync", variant="warning"
+                    )
+                    yield Label(
+                        "Manage local SQLite cache & Day-by-Day sync",
+                        id="label-db-banner",
+                    )
+
+                with DetailScrollContainer(
+                    id="db-status-container",
+                    classes="detail-container",
+                ):
+                    yield Markdown(
+                        "Click **Check Status** or **Update Now (Sync)** to inspect synchronization health.",
+                        id="db-status-content",
+                        classes="detail-panel",
+                    )
+
         yield Footer()
 
     def on_mount(self) -> None:
@@ -1134,6 +1156,12 @@ class VulnCheckApp(App):
             self.load_kev_catalog(vendor_filter="f5")
         elif bid == "btn-filter-ransomware":
             self.load_kev_catalog(ransomware_only=True)
+
+        # 8. Database Status & Sync buttons
+        elif bid == "btn-db-status":
+            self.render_db_status()
+        elif bid == "btn-db-sync":
+            self.run_db_sync()
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
         """Handle Enter key pressed in Input fields."""
@@ -1826,6 +1854,79 @@ class VulnCheckApp(App):
             )
 
         return "\n".join(lines)
+
+    # =========================================================================
+    # TAB 4: DATABASE STATUS & SYNCHRONIZATION
+    # =========================================================================
+
+    def render_db_status(self) -> None:
+        """Render database status and sync metadata into Tab 4."""
+        from src.fetcher_cisa import get_cisa_fetcher
+        from src.fetcher_nvd import NVDDatabase
+
+        db = NVDDatabase()
+        cve_count = db.get_cve_count()
+        kev_count = get_cisa_fetcher().count()
+        metadata = db.get_all_sync_metadata()
+
+        lines = [
+            "# Vulnerability Database Health & Sync Status",
+            "",
+            f"**SQLite Database Path:** `{db.db_path}`",
+            "",
+            "| Chỉ số | Giá trị |",
+            "| :--- | :--- |",
+            f"| **Tổng số NVD CVE Records** | `{cve_count:,}` |",
+            f"| **Tổng số CISA KEV Catalog** | `{kev_count:,}` |",
+            "| **Cơ chế đồng bộ** | NIST NVD API 2.0 (Incremental) + CISA KEV JSON Feed |",
+            "",
+            "---",
+            "",
+            "### Chi tiết lịch sử đồng bộ (Sync Metadata)",
+            "",
+            "| Nguồn dữ liệu | Thời gian đồng bộ gần nhất (UTC) | Trạng thái | Số bản ghi | Chi tiết |",
+            "| :--- | :--- | :--- | :--- | :--- |",
+        ]
+
+        if not metadata:
+            lines.append(
+                "| `NVD Offline Seed` | `Initial Seed` | `ACTIVE` | "
+                f"`{cve_count:,}` | Pre-seeded offline bundle |"
+            )
+            lines.append(
+                "| `CISA KEV Catalog` | `Initial Seed` | `ACTIVE` | "
+                f"`{kev_count:,}` | Official CISA KEV catalog |"
+            )
+        else:
+            for m in metadata:
+                source = m.get("source", "")
+                ts = m.get("last_sync_timestamp", "N/A")
+                status = m.get("status", "")
+                count = m.get("record_count", 0)
+                details = m.get("details", "")
+                lines.append(
+                    f"| `{source}` | `{ts}` | `{status.upper()}` | `{count}` | {details} |"
+                )
+
+        detail = self.query_one("#db-status-content", Markdown)
+        detail.update("\n".join(lines))
+
+    def run_db_sync(self) -> None:
+        """Trigger incremental database synchronization in TUI."""
+        from src.fetcher_cisa import get_cisa_fetcher
+
+        detail = self.query_one("#db-status-content", Markdown)
+        detail.update(
+            "### ⏳ Synchronizing Database...\nChecking CISA KEV and NVD updates..."
+        )
+
+        # Update CISA KEV
+        cisa_res = get_cisa_fetcher().sync_incremental()
+        self.render_db_status()
+        self.notify(
+            f"Database sync finished: CISA KEV {cisa_res.get('status')}",
+            title="Database Update",
+        )
 
 
 if __name__ == "__main__":

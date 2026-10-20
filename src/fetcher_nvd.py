@@ -12,6 +12,7 @@ Features:
 import logging
 import sqlite3
 import time
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -717,6 +718,20 @@ class NVDDatabase:
                 "CREATE INDEX IF NOT EXISTS idx_cve_ranges_cve_id ON cve_version_ranges(cve_id)"
             )
 
+            # 5. sync_metadata table for tracking incremental and day-by-day updates
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS sync_metadata (
+                    source TEXT PRIMARY KEY,
+                    last_sync_timestamp TEXT,
+                    status TEXT,
+                    etag TEXT,
+                    record_count INTEGER,
+                    details TEXT
+                )
+                """
+            )
+
             conn.commit()
 
         # Seed if empty
@@ -914,6 +929,64 @@ class NVDDatabase:
             cursor.execute("SELECT COUNT(*) FROM cve_records")
             row = cursor.fetchone()
             return row[0] if row else 0
+
+    def set_sync_metadata(
+        self,
+        source: str,
+        last_sync_timestamp: Optional[str] = None,
+        status: str = "success",
+        etag: Optional[str] = None,
+        record_count: int = 0,
+        details: str = "",
+    ) -> None:
+        """Upsert sync metadata for a specific data source."""
+        if not source:
+            return
+
+        ts = last_sync_timestamp or datetime.now(timezone.utc).strftime(
+            "%Y-%m-%dT%H:%M:%S.000Z"
+        )
+
+        with self._get_connection() as conn:
+            conn.execute(
+                """
+                INSERT INTO sync_metadata (
+                    source, last_sync_timestamp, status, etag, record_count, details
+                ) VALUES (?, ?, ?, ?, ?, ?)
+                ON CONFLICT(source) DO UPDATE SET
+                    last_sync_timestamp = excluded.last_sync_timestamp,
+                    status = excluded.status,
+                    etag = COALESCE(excluded.etag, sync_metadata.etag),
+                    record_count = excluded.record_count,
+                    details = excluded.details
+                """,
+                (source, ts, status, etag, record_count, details),
+            )
+            conn.commit()
+
+    def get_sync_metadata(self, source: str) -> Optional[Dict[str, Any]]:
+        """Retrieve sync metadata record for a given source."""
+        if not source:
+            return None
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT source, last_sync_timestamp, status, etag, record_count, details FROM sync_metadata WHERE source = ?",
+                (source,),
+            )
+            row = cursor.fetchone()
+            if row:
+                return dict(row)
+            return None
+
+    def get_all_sync_metadata(self) -> List[Dict[str, Any]]:
+        """Retrieve all sync metadata records."""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT source, last_sync_timestamp, status, etag, record_count, details FROM sync_metadata ORDER BY source"
+            )
+            return [dict(r) for r in cursor.fetchall()]
 
     def get_cve(
         self, cve_id: str, fetch_remote: bool = False
@@ -1417,6 +1490,174 @@ class NVDFetcher(NVDDatabase):
         )
         return total_synced
 
+    def sync_incremental_cves(
+        self,
+        vendor: str,
+        product: str,
+        cpe_name: str,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
+        days_back: Optional[int] = None,
+        max_results: int = 500,
+    ) -> int:
+        """Synchronize CVEs from NVD API 2.0 within a specific modification time window.
+
+        Args:
+            vendor: Standardized vendor name.
+            product: Standardized product name.
+            cpe_name: Target CPE 2.3 string.
+            start_date: ISO-8601 UTC string (e.g. 2026-03-01T00:00:00.000Z).
+            end_date: ISO-8601 UTC string (e.g. 2026-03-05T00:00:00.000Z).
+            days_back: Number of days back to sync if start_date is not provided.
+            max_results: Maximum items to sync.
+
+        Returns:
+            Number of newly synced or updated CVE records.
+        """
+        source_key = f"nvd_{vendor.lower()}_{product.lower()}"
+        now_utc = datetime.now(timezone.utc)
+
+        # 1. Resolve start_date
+        if not start_date:
+            meta = self.get_sync_metadata(source_key)
+            if meta and meta.get("last_sync_timestamp"):
+                start_date = meta["last_sync_timestamp"]
+            elif days_back is not None and days_back > 0:
+                start_dt = now_utc - timedelta(days=days_back)
+                start_date = start_dt.strftime("%Y-%m-%dT%H:%M:%S.000Z")
+            else:
+                # Default to 7 days back
+                start_dt = now_utc - timedelta(days=7)
+                start_date = start_dt.strftime("%Y-%m-%dT%H:%M:%S.000Z")
+
+        # 2. Resolve end_date
+        if not end_date:
+            end_date = now_utc.strftime("%Y-%m-%dT%H:%M:%S.000Z")
+
+        # Ensure ISO-8601 format required by NVD 2.0 (RFC 3339 format)
+        # NVD expects: YYYY-MM-DDTHH:mm:ss.SSS (with trailing Z or +00:00)
+        def _format_nvd_iso(dt_str: str) -> str:
+            clean = dt_str.replace(" ", "T").rstrip("Z")
+            if "." not in clean:
+                clean = f"{clean}.000"
+            return f"{clean}Z"
+
+        nvd_start = _format_nvd_iso(start_date)
+        nvd_end = _format_nvd_iso(end_date)
+
+        logger.info(
+            "Performing incremental NVD sync for %s/%s from %s to %s",
+            vendor,
+            product,
+            nvd_start,
+            nvd_end,
+        )
+
+        headers = {"User-Agent": "Vuln-Check-Net/1.0"}
+        if self.api_key:
+            headers["apiKey"] = self.api_key
+
+        total_synced = 0
+        start_index = 0
+        page_size = 100
+
+        while total_synced < max_results:
+            current_limit = min(page_size, max_results - total_synced)
+            params = {
+                "virtualMatchString": cpe_name,
+                "lastModStartDate": nvd_start,
+                "lastModEndDate": nvd_end,
+                "startIndex": start_index,
+                "resultsPerPage": current_limit,
+            }
+
+            # Rate limit
+            delay = NVD_DELAY_WITH_KEY if self.api_key else NVD_DELAY_NO_KEY
+            elapsed = time.time() - self.last_request_time
+            if elapsed < delay:
+                time.sleep(delay - elapsed)
+
+            attempt = 0
+            current_backoff = BACKOFF_FACTOR
+            success = False
+            data = None
+
+            while attempt < MAX_RETRIES:
+                attempt += 1
+                try:
+                    self.last_request_time = time.time()
+                    resp = requests.get(
+                        NVD_API_URL,
+                        params=params,
+                        headers=headers,
+                        timeout=HTTP_TIMEOUT,
+                    )
+                    if resp.status_code == 200:
+                        data = resp.json()
+                        success = True
+                        break
+                    elif resp.status_code == 429:
+                        time.sleep(current_backoff)
+                        current_backoff *= 2
+                    else:
+                        logger.warning(
+                            "Incremental NVD API status %d for %s",
+                            resp.status_code,
+                            cpe_name,
+                        )
+                        break
+                except requests.RequestException as e:
+                    logger.debug("Incremental NVD request error: %s", e)
+                    time.sleep(current_backoff)
+                    current_backoff *= 2
+
+            if not success or not data:
+                break
+
+            total_results_avail = data.get("totalResults", 0)
+            vulnerabilities = data.get("vulnerabilities", [])
+            if not vulnerabilities:
+                break
+
+            for item in vulnerabilities:
+                cve_item = item.get("cve", {})
+                record = self._parse_nvd_item(
+                    cve_item,
+                    default_vendor=vendor,
+                    default_product=product,
+                )
+                if not record.get("vendor"):
+                    record["vendor"] = vendor
+                if not record.get("product"):
+                    record["product"] = product
+
+                ranges = record.get("version_ranges", [])
+                for r in ranges:
+                    if not r.get("vendor"):
+                        r["vendor"] = vendor
+                    if not r.get("product"):
+                        r["product"] = product
+
+                self.upsert_cve(record, ranges=ranges)
+                total_synced += 1
+                if total_synced >= max_results:
+                    break
+
+            start_index += len(vulnerabilities)
+            if total_results_avail is not None and start_index >= total_results_avail:
+                break
+
+        # Record metadata
+        self.set_sync_metadata(
+            source=source_key,
+            last_sync_timestamp=nvd_end,
+            status="success",
+            record_count=total_synced,
+            details=f"Synced {total_synced} modified CVEs between {nvd_start} and {nvd_end}",
+        )
+
+        return total_synced
+
 
 def sync_product_cves(
     vendor: str,
@@ -1434,6 +1675,36 @@ def sync_product_cves(
         cpe_name=cpe_name,
         max_results=max_results,
     )
+
+
+def sync_incremental_cves(
+    vendor: str,
+    product: str,
+    cpe_name: str,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    days_back: Optional[int] = None,
+    max_results: int = 500,
+    db_path: Path = DB_PATH,
+    fetcher: Optional[NVDFetcher] = None,
+) -> int:
+    """Convenience module-level function to incrementally sync product CVEs from NVD API 2.0."""
+    instance = fetcher or NVDFetcher(db_path=db_path)
+    return instance.sync_incremental_cves(
+        vendor=vendor,
+        product=product,
+        cpe_name=cpe_name,
+        start_date=start_date,
+        end_date=end_date,
+        days_back=days_back,
+        max_results=max_results,
+    )
+
+
+def get_sync_status(db_path: Path = DB_PATH) -> List[Dict[str, Any]]:
+    """Retrieve all sync metadata records."""
+    db = NVDDatabase(db_path=db_path)
+    return db.get_all_sync_metadata()
 
 
 # Alias for backward compatibility

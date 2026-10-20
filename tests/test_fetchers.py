@@ -403,3 +403,167 @@ class TestNVDSyncProductCVEs:
         cve3 = fetcher.get_cve("CVE-2024-88003")
         assert cve3 is not None
         assert cve3["version_ranges"][0]["exact_version"] == "9.14(1)10"
+
+    def test_sync_metadata_crud(self, temp_db):
+        """Test sync_metadata table CRUD operations."""
+        db = NVDDatabase(db_path=temp_db)
+
+        # Initially empty for custom source
+        meta = db.get_sync_metadata("test_source")
+        assert meta is None
+
+        # Insert metadata
+        db.set_sync_metadata(
+            source="test_source",
+            last_sync_timestamp="2026-03-01T12:00:00.000Z",
+            status="success",
+            etag='"abc123etag"',
+            record_count=42,
+            details="Test sync details",
+        )
+
+        meta = db.get_sync_metadata("test_source")
+        assert meta is not None
+        assert meta["source"] == "test_source"
+        assert meta["last_sync_timestamp"] == "2026-03-01T12:00:00.000Z"
+        assert meta["status"] == "success"
+        assert meta["etag"] == '"abc123etag"'
+        assert meta["record_count"] == 42
+        assert meta["details"] == "Test sync details"
+
+        # Update metadata
+        db.set_sync_metadata(
+            source="test_source",
+            last_sync_timestamp="2026-03-05T12:00:00.000Z",
+            status="up_to_date",
+            record_count=50,
+            details="Updated details",
+        )
+
+        updated = db.get_sync_metadata("test_source")
+        assert updated["last_sync_timestamp"] == "2026-03-05T12:00:00.000Z"
+        assert updated["status"] == "up_to_date"
+        assert updated["record_count"] == 50
+        # ETag should be retained via COALESCE
+        assert updated["etag"] == '"abc123etag"'
+
+        all_meta = db.get_all_sync_metadata()
+        assert any(m["source"] == "test_source" for m in all_meta)
+
+    def test_sync_incremental_cves_mocked(self, temp_db):
+        """Test NVD incremental sync with mocked time-window query."""
+        fetcher = NVDFetcher(db_path=temp_db)
+
+        mock_payload = {
+            "totalResults": 1,
+            "vulnerabilities": [
+                {
+                    "cve": {
+                        "id": "CVE-2026-99001",
+                        "published": "2026-03-01T08:00:00.000",
+                        "lastModified": "2026-03-02T10:00:00.000",
+                        "descriptions": [
+                            {"lang": "en", "value": "Fresh Incremental Flaw"}
+                        ],
+                        "metrics": {
+                            "cvssMetricV31": [
+                                {
+                                    "cvssData": {
+                                        "baseScore": 9.1,
+                                        "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H",
+                                    }
+                                }
+                            ]
+                        },
+                        "configurations": [],
+                    }
+                }
+            ],
+        }
+
+        captured_params = {}
+
+        class MockResponse:
+            def __init__(self, json_data, status_code=200):
+                self.json_data = json_data
+                self.status_code = status_code
+
+            def json(self):
+                return self.json_data
+
+        def mock_get(url, params=None, **kwargs):
+            nonlocal captured_params
+            captured_params = params or {}
+            return MockResponse(mock_payload)
+
+        with patch("requests.get", side_effect=mock_get):
+            synced = fetcher.sync_incremental_cves(
+                vendor="cisco",
+                product="adaptive_security_appliance",
+                cpe_name="cpe:2.3:o:cisco:adaptive_security_appliance_software",
+                start_date="2026-03-01T00:00:00.000Z",
+                end_date="2026-03-05T00:00:00.000Z",
+            )
+
+        assert synced == 1
+        assert captured_params.get("lastModStartDate") == "2026-03-01T00:00:00.000Z"
+        assert captured_params.get("lastModEndDate") == "2026-03-05T00:00:00.000Z"
+
+        # Verify record and sync_metadata
+        cve = fetcher.get_cve("CVE-2026-99001")
+        assert cve is not None
+        assert cve["cvss_score"] == 9.1
+
+        meta = fetcher.get_sync_metadata("nvd_cisco_adaptive_security_appliance")
+        assert meta is not None
+        assert meta["status"] == "success"
+        assert meta["record_count"] == 1
+
+    def test_cisa_kev_incremental_sync_mocked(self, tmp_path):
+        """Test CISA KEV incremental sync with 304 Not Modified and 200 Update."""
+        cache_file = tmp_path / "cisa_kev_cache.json"
+        fetcher = CisaKevFetcher(cache_file=cache_file, auto_download=False)
+
+        # 1. Mock HTTP 304 Not Modified
+        class Mock304Response:
+            status_code = 304
+            headers = {}
+
+        with patch("requests.get", return_value=Mock304Response()):
+            res = fetcher.sync_incremental()
+            assert res["status"] == "up_to_date"
+            assert res["added_count"] == 0
+
+        # 2. Mock HTTP 200 with new CVE
+        mock_kev_json = {
+            "title": "CISA Known Exploited Vulnerabilities Catalog",
+            "catalogVersion": "2026.03.01",
+            "dateReleased": "2026-03-01",
+            "count": 1,
+            "vulnerabilities": [
+                {
+                    "cveID": "CVE-2026-77777",
+                    "vendorProject": "Cisco",
+                    "product": "Adaptive Security Appliance",
+                    "vulnerabilityName": "Cisco ASA Zero-Day Exploit",
+                    "dateAdded": "2026-03-01",
+                    "shortDescription": "Active zero-day in Cisco ASA",
+                    "requiredAction": "Apply vendor mitigations immediately.",
+                    "dueDate": "2026-03-15",
+                    "knownRansomwareCampaignUse": "Known",
+                }
+            ],
+        }
+
+        class Mock200Response:
+            status_code = 200
+            headers = {"ETag": '"new-etag-999"'}
+
+            def json(self):
+                return mock_kev_json
+
+        with patch("requests.get", return_value=Mock200Response()):
+            res = fetcher.sync_incremental(force=True)
+            assert res["status"] == "updated"
+            assert fetcher.is_in_kev("CVE-2026-77777")
+            assert fetcher.get_kev_details("CVE-2026-77777") is not None

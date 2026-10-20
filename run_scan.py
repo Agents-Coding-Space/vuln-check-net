@@ -237,6 +237,145 @@ def handle_update_kev(args: argparse.Namespace) -> None:
         )
 
 
+def handle_db_status(args: argparse.Namespace) -> None:
+    """Handle `db status` subcommand."""
+    from src.fetcher_nvd import NVDDatabase
+
+    db = NVDDatabase()
+    cve_count = db.get_cve_count()
+    kev_fetcher = CisaKevFetcher()
+    metadata = db.get_all_sync_metadata()
+
+    console.print(
+        Panel(
+            f"[bold cyan]Local SQLite Database:[/bold cyan] {db.db_path}\n"
+            f"[bold white]Total NVD CVE Records:[/bold white] [green]{cve_count:,}[/green]\n"
+            f"[bold white]Total CISA KEV Catalog:[/bold white] [yellow]{kev_fetcher.count():,}[/yellow]",
+            title="Database Status & Synchronization Health",
+            border_style="cyan",
+        )
+    )
+
+    table = Table(box=box.ROUNDED, header_style="bold cyan")
+    table.add_column("Data Source", style="bold white", width=26)
+    table.add_column("Last Sync (UTC)", width=24)
+    table.add_column("Status", width=14, justify="center")
+    table.add_column("Records", width=10, justify="right")
+    table.add_column("Details", width=36)
+
+    if not metadata:
+        # Show default summary if no metadata table records yet
+        table.add_row(
+            "NVD Offline Seed",
+            "Initial Seed",
+            "[green]ACTIVE[/green]",
+            f"{cve_count:,}",
+            "Pre-seeded offline bundle",
+        )
+        table.add_row(
+            "CISA KEV Catalog",
+            "Initial Seed",
+            "[green]ACTIVE[/green]",
+            f"{kev_fetcher.count():,}",
+            "Official CISA KEV catalog",
+        )
+    else:
+        for m in metadata:
+            status_style = (
+                "[green]SUCCESS[/green]"
+                if m.get("status") in ("success", "up_to_date")
+                else "[red]FAILED[/red]"
+            )
+            table.add_row(
+                m.get("source", ""),
+                m.get("last_sync_timestamp", "N/A"),
+                status_style,
+                str(m.get("record_count", 0)),
+                m.get("details", "")[:34],
+            )
+
+    console.print(table)
+
+
+def handle_db_update(args: argparse.Namespace) -> None:
+    """Handle `db update` subcommand."""
+    from src.fetcher_nvd import NVDFetcher
+
+    fetcher = NVDFetcher()
+    days_back = args.days
+    force_full = args.full
+    target_product = args.product.lower() if args.product else "all"
+
+    console.print(
+        Panel(
+            f"[bold]Mode:[/bold] {'FULL SYNC' if force_full else f'INCREMENTAL SYNC ({days_back} days window)'}\n"
+            f"[bold]Target Product:[/bold] {target_product.upper()}\n"
+            f"[dim]Synchronizing with NIST NVD API 2.0 and CISA KEV feeds...[/dim]",
+            title="Database Update",
+            border_style="blue",
+        )
+    )
+
+    # 1. Update CISA KEV
+    console.print("[cyan]➜ Updating CISA KEV catalog...[/cyan]")
+    cisa_res = CisaKevFetcher().sync_incremental(force=force_full)
+    console.print(
+        f"  [green]✔ CISA KEV Status:[/green] {cisa_res.get('status')} "
+        f"(Total: {cisa_res.get('total_count')}, Added: {cisa_res.get('added_count')})"
+    )
+
+    # 2. Update NVD by Product
+    cpe_map = {
+        "cisco_asa": (
+            "cisco",
+            "adaptive_security_appliance",
+            "cpe:2.3:o:cisco:adaptive_security_appliance_software",
+        ),
+        "cisco_ios_xe": ("cisco", "ios_xe", "cpe:2.3:o:cisco:ios_xe"),
+        "fortinet_fortios": ("fortinet", "fortios", "cpe:2.3:o:fortinet:fortios"),
+        "paloalto_panos": (
+            "palo_alto_networks",
+            "pan-os",
+            "cpe:2.3:o:paloaltonetworks:pan-os",
+        ),
+    }
+
+    products_to_sync = (
+        cpe_map.keys()
+        if target_product in ("all", "*")
+        else [target_product]
+        if target_product in cpe_map
+        else []
+    )
+
+    if not products_to_sync:
+        console.print(
+            f"[red]Unknown product '{target_product}'. Choices: all, {', '.join(cpe_map.keys())}[/red]"
+        )
+        return
+
+    for p in products_to_sync:
+        vendor, product, cpe = cpe_map[p]
+        console.print(f"[cyan]➜ Synchronizing NVD for {vendor}/{product}...[/cyan]")
+        if force_full:
+            count = fetcher.sync_product_cves(
+                vendor=vendor, product=product, cpe_name=cpe, max_results=1000
+            )
+        else:
+            count = fetcher.sync_incremental_cves(
+                vendor=vendor,
+                product=product,
+                cpe_name=cpe,
+                days_back=days_back,
+                max_results=500,
+            )
+        console.print(f"  [green]✔ Synced {count} CVEs for {vendor}/{product}[/green]")
+
+    console.print(
+        "[bold green]\nDatabase synchronization finished successfully![/bold green]"
+    )
+
+
 def handle_tui(args: argparse.Namespace) -> None:
     """Handle `tui` subcommand."""
     from src.tui.app import VulnCheckApp
@@ -245,9 +384,47 @@ def handle_tui(args: argparse.Namespace) -> None:
     app.run()
 
 
+def check_startup_freshness() -> None:
+    """Check database freshness on startup and notify if update is recommended."""
+    from datetime import datetime, timezone
+    from src.config import AUTO_UPDATE_ON_STARTUP, CACHE_EXPIRY_HOURS
+    from src.fetcher_nvd import NVDDatabase
+
+    if not AUTO_UPDATE_ON_STARTUP:
+        return
+
+    db = NVDDatabase()
+    metadata = db.get_all_sync_metadata()
+    if not metadata:
+        return
+
+    now_utc = datetime.now(timezone.utc)
+    stale_sources = []
+
+    for m in metadata:
+        ts_str = m.get("last_sync_timestamp")
+        if not ts_str:
+            continue
+        try:
+            clean_ts = ts_str.rstrip("Z").split(".")[0]
+            sync_dt = datetime.fromisoformat(clean_ts).replace(tzinfo=timezone.utc)
+            hours_diff = (now_utc - sync_dt).total_seconds() / 3600.0
+            if hours_diff > CACHE_EXPIRY_HOURS:
+                stale_sources.append((m.get("source"), int(hours_diff)))
+        except Exception:
+            pass
+
+    if stale_sources:
+        console.print(
+            f"[dim yellow]ℹ Notice: Local database was last updated over {CACHE_EXPIRY_HOURS} hours ago. "
+            f"Run [bold cyan]python run_scan.py db update[/bold cyan] to sync the latest daily CVEs.[/dim yellow]"
+        )
+
+
 def main() -> None:
     """Main CLI entry point."""
     render_banner()
+    check_startup_freshness()
 
     parser = argparse.ArgumentParser(
         prog="python run_scan.py",
@@ -317,6 +494,44 @@ def main() -> None:
         "update-kev", help="Fetch latest CISA Known Exploited Vulnerabilities catalog"
     )
 
+    # db subcommand
+    p_db = subparsers.add_parser(
+        "db", help="Manage local vulnerability databases (NVD API 2.0 & CISA KEV)"
+    )
+    db_subparsers = p_db.add_subparsers(dest="db_action", help="DB action")
+
+    # db status
+    db_subparsers.add_parser("status", help="Show database sync status and health")
+
+    # db update
+    p_db_update = db_subparsers.add_parser(
+        "update", help="Update database incrementally or fully from NVD and CISA"
+    )
+    p_db_update.add_argument(
+        "--days",
+        type=int,
+        default=7,
+        help="Number of days back to sync modified CVEs (default: 7)",
+    )
+    p_db_update.add_argument(
+        "--full",
+        action="store_true",
+        default=False,
+        help="Perform full catalog sync instead of incremental window",
+    )
+    p_db_update.add_argument(
+        "--product",
+        choices=[
+            "all",
+            "cisco_asa",
+            "cisco_ios_xe",
+            "fortinet_fortios",
+            "paloalto_panos",
+        ],
+        default="all",
+        help="Specific product to sync (default: all)",
+    )
+
     # tui subcommand
     p_tui = subparsers.add_parser(
         "tui", help="Launch interactive Terminal User Interface (TUI)"
@@ -343,6 +558,13 @@ def main() -> None:
         handle_lookup(args)
     elif args.subcommand == "update-kev":
         handle_update_kev(args)
+    elif args.subcommand == "db":
+        if args.db_action == "status":
+            handle_db_status(args)
+        elif args.db_action == "update":
+            handle_db_update(args)
+        else:
+            p_db.print_help()
     elif args.subcommand == "tui":
         handle_tui(args)
 
